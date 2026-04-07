@@ -6,7 +6,22 @@ _base_ = [
 norm_cfg = dict(type='BN', requires_grad=True)
 
 model = dict(
+    backbone=dict(
+        _delete_=True,
+        type='DINOv3Backbone',
+        model_name='base',
+        out_indices=(2, 5, 8, 11),
+        output_cls_token=True,
+        pretrained='pretrained/dinov3_base.pth'),
+    neck=dict(
+        type='DINOv3AdaBinsNeck',
+        in_channels=768,
+        out_channels=[96, 192, 384, 768],
+        readout_type='project',
+        patch_size=16),
     decode_head=dict(
+        in_channels=[96, 192, 384, 768],
+        up_sample_channels=[128, 256, 512, 768],
         min_depth=250,
         max_depth=300,
         norm_cfg=norm_cfg),
@@ -21,7 +36,10 @@ optimizer = dict(
     type='AdamW',
     lr=max_lr,
     weight_decay=0.1,
-    paramwise_cfg=dict(custom_keys={'decode_head': dict(lr_mult=10)}))
+    paramwise_cfg=dict(custom_keys={
+        'backbone': dict(lr_mult=0.1),
+        'decode_head': dict(lr_mult=10),
+    }))
 
 # learning policy
 lr_config = dict(
