@@ -48,31 +48,52 @@ class CustomDepthDataset(Dataset):
 
     def __init__(self,
                  pipeline,
-                 data_root,
+                 data_root=None,
                  test_mode=True,
                  min_depth=1e-3,
                  max_depth=10,
                  depth_scale=1,
                  img_dir='rgb',
-                 depth_dir='depth'):
+                 depth_dir='depth',
+                 split=None):
 
         self.pipeline = Compose(pipeline)
-        self.img_path = os.path.join(data_root, img_dir)
-        self.depth_path = os.path.join(data_root, depth_dir)
+        self.data_root = data_root
+        self.img_path = self._resolve_path(data_root, img_dir)
+        self.depth_path = self._resolve_path(data_root, depth_dir)
+        self.split = self._resolve_split_path(data_root, split)
         self.test_mode = test_mode
         self.min_depth = min_depth
         self.max_depth = max_depth
         self.depth_scale = depth_scale
 
         # load annotations
-        self.img_infos = self.load_annotations(self.img_path, self.depth_path)
+        self.img_infos = self.load_annotations(self.img_path, self.depth_path,
+                                               self.split)
         
 
     def __len__(self):
         """Total number of samples of data."""
         return len(self.img_infos)
 
-    def load_annotations(self, img_dir, depth_dir):
+    def _resolve_path(self, data_root, path):
+        if path is None:
+            return None
+        if data_root is not None and not osp.isabs(path):
+            return osp.join(data_root, path)
+        return path
+
+    def _resolve_split_path(self, data_root, split):
+        if split is None:
+            return None
+        if osp.isabs(split):
+            return split
+        candidate = osp.join(data_root, split) if data_root is not None else split
+        if osp.exists(candidate):
+            return candidate
+        return split
+
+    def load_annotations(self, img_dir, depth_dir, split=None):
         """Load annotation from directory.
         Args:
             img_dir (str): Path to image directory. Load all the images under the root.
@@ -82,19 +103,40 @@ class CustomDepthDataset(Dataset):
 
         img_infos = []
 
-        imgs = sorted(os.listdir(img_dir))
-        depths = sorted(os.listdir(depth_dir)) if osp.isdir(depth_dir) else []
-        depth_lookup = {depth_name: depth_name for depth_name in depths}
+        if split is not None:
+            with open(split) as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith('#'):
+                        continue
 
-        for img in imgs:
-            img_info = dict()
-            img_info['filename'] = img
-            if img in depth_lookup:
-                img_info['ann'] = dict(depth_map=depth_lookup[img])
-            elif not self.test_mode:
-                raise FileNotFoundError(
-                    f'Cannot find matched depth map for image "{img}" in "{depth_dir}".')
-            img_infos.append(img_info)
+                    fields = line.split()
+                    if len(fields) == 1:
+                        img_name, depth_name = fields[0], fields[0]
+                    else:
+                        img_name, depth_name = fields[:2]
+
+                    img_info = dict(filename=img_name)
+                    if depth_name != 'None':
+                        img_info['ann'] = dict(depth_map=depth_name)
+                    elif not self.test_mode:
+                        raise FileNotFoundError(
+                            f'Cannot find matched depth map for image "{img_name}" in split "{split}".')
+                    img_infos.append(img_info)
+        else:
+            imgs = sorted(os.listdir(img_dir))
+            depths = sorted(os.listdir(depth_dir)) if osp.isdir(depth_dir) else []
+            depth_lookup = {depth_name: depth_name for depth_name in depths}
+
+            for img in imgs:
+                img_info = dict()
+                img_info['filename'] = img
+                if img in depth_lookup:
+                    img_info['ann'] = dict(depth_map=depth_lookup[img])
+                elif not self.test_mode:
+                    raise FileNotFoundError(
+                        f'Cannot find matched depth map for image "{img}" in "{depth_dir}".')
+                img_infos.append(img_info)
 
         # github issue:: make sure the same order
         img_infos = sorted(img_infos, key=lambda x: x['filename'])

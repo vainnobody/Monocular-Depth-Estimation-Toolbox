@@ -1,7 +1,6 @@
 # dataset settings
 dataset_type = 'CustomDepthDataset'
-train_data_root = 'data/vaihingen/train'
-val_data_root = 'data/vaihingen/train'
+data_root = 'data/vaihingen'
 
 img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53],
@@ -9,6 +8,7 @@ img_norm_cfg = dict(
     to_rgb=True)
 
 crop_size = (512, 512)
+train_repeat_times = 64
 
 train_pipeline = [
     dict(type='LoadImageFromFile'),
@@ -29,7 +29,7 @@ test_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(
         type='MultiScaleFlipAug',
-        img_scale=(1919, 2569),
+        img_scale=(512, 512),
         flip=False,
         transforms=[
             dict(type='Normalize', **img_norm_cfg),
@@ -43,37 +43,34 @@ test_pipeline = [
         ])
 ]
 
+common_dataset_args = dict(
+    type=dataset_type,
+    data_root=data_root,
+    img_dir='image',
+    depth_dir='dsm',
+    depth_scale=1,
+    min_depth=250,
+    max_depth=300,
+)
+
 data = dict(
     samples_per_gpu=2,
     workers_per_gpu=2,
     train=dict(
         type='RepeatDataset',
-        times=512,
+        times=train_repeat_times,
         dataset=dict(
-            type=dataset_type,
-            data_root=train_data_root,
-            img_dir='image',
-            depth_dir='dsm',
-            depth_scale=1,
+            **common_dataset_args,
+            split='splits/vaihingen/train.txt',
             test_mode=False,
-            min_depth=250,
-            max_depth=300,
             pipeline=train_pipeline)),
     val=dict(
-        type=dataset_type,
-        data_root=val_data_root,
-        img_dir='image',
-        depth_dir='dsm',
-        depth_scale=1,
-        min_depth=250,
-        max_depth=300,
+        **common_dataset_args,
+        split='splits/vaihingen/val.txt',
+        test_mode=True,
         pipeline=test_pipeline),
     test=dict(
-        type=dataset_type,
-        data_root=val_data_root,
-        img_dir='image',
-        depth_dir='dsm',
-        depth_scale=1,
-        min_depth=250,
-        max_depth=300,
+        **common_dataset_args,
+        split='splits/vaihingen/test.txt',
+        test_mode=True,
         pipeline=test_pipeline))
