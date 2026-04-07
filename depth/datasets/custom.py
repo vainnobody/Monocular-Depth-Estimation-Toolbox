@@ -1,8 +1,5 @@
-from logging import raiseExceptions
 import os.path as osp
-import warnings
 from collections import OrderedDict
-from functools import reduce
 
 import mmcv
 import numpy as np
@@ -15,11 +12,8 @@ from depth.utils import get_root_logger
 from depth.datasets.builder import DATASETS
 from depth.datasets.pipelines import Compose
 
-from depth.ops import resize
-
 from PIL import Image
 
-import torch
 import os
 
 
@@ -58,11 +52,13 @@ class CustomDepthDataset(Dataset):
                  test_mode=True,
                  min_depth=1e-3,
                  max_depth=10,
-                 depth_scale=1):
+                 depth_scale=1,
+                 img_dir='rgb',
+                 depth_dir='depth'):
 
         self.pipeline = Compose(pipeline)
-        self.img_path = os.path.join(data_root, 'rgb')
-        self.depth_path = os.path.join(data_root, 'depth')
+        self.img_path = os.path.join(data_root, img_dir)
+        self.depth_path = os.path.join(data_root, depth_dir)
         self.test_mode = test_mode
         self.min_depth = min_depth
         self.max_depth = max_depth
@@ -86,25 +82,19 @@ class CustomDepthDataset(Dataset):
 
         img_infos = []
 
-        imgs = os.listdir(img_dir)
-        imgs.sort()
+        imgs = sorted(os.listdir(img_dir))
+        depths = sorted(os.listdir(depth_dir)) if osp.isdir(depth_dir) else []
+        depth_lookup = {depth_name: depth_name for depth_name in depths}
 
-        if self.test_mode is not True:
-            depths = os.listdir(depth_dir)
-            depths.sort()
-
-            for img, depth in zip(imgs, depths):
-                img_info = dict()
-                img_info['filename'] = img
-                img_info['ann'] = dict(depth_map=depth)
-                img_infos.append(img_info)
-        
-        else:
-
-            for img in imgs:
-                img_info = dict()
-                img_info['filename'] = img
-                img_infos.append(img_info)
+        for img in imgs:
+            img_info = dict()
+            img_info['filename'] = img
+            if img in depth_lookup:
+                img_info['ann'] = dict(depth_map=depth_lookup[img])
+            elif not self.test_mode:
+                raise FileNotFoundError(
+                    f'Cannot find matched depth map for image "{img}" in "{depth_dir}".')
+            img_infos.append(img_info)
 
         # github issue:: make sure the same order
         img_infos = sorted(img_infos, key=lambda x: x['filename'])
@@ -158,6 +148,8 @@ class CustomDepthDataset(Dataset):
 
         img_info = self.img_infos[idx]
         results = dict(img_info=img_info)
+        if 'ann' in img_info:
+            results['ann_info'] = img_info['ann']
         self.pre_pipeline(results)
         return self.pipeline(results)
 
@@ -171,15 +163,91 @@ class CustomDepthDataset(Dataset):
 
         return self.img_infos[idx]['ann']
     
-    # waiting to be done
     def format_results(self, results, imgfile_prefix=None, indices=None, **kwargs):
         """Place holder to format result to dataset specific output."""
         results[0] = (results[0] * self.depth_scale) # Do not convert to np.uint16 for ensembling. # .astype(np.uint16)
         return results
 
-    # design your own evaluation pipeline
+    def get_gt_depth_maps(self):
+        """Get ground truth depth maps for evaluation."""
+        for img_info in self.img_infos:
+            if 'ann' not in img_info:
+                raise ValueError(
+                    'Ground-truth depth is unavailable for this dataset split.')
+            depth_map = osp.join(self.depth_path, img_info['ann']['depth_map'])
+            depth_map_gt = np.asarray(Image.open(depth_map),
+                                      dtype=np.float32) / self.depth_scale
+            yield np.expand_dims(depth_map_gt, axis=0)
+
     def pre_eval(self, preds, indices):
-        pass
+        """Collect evaluation results from each iteration."""
+        if not isinstance(indices, list):
+            indices = [indices]
+        if not isinstance(preds, list):
+            preds = [preds]
+
+        pre_eval_results = []
+        pre_eval_preds = []
+
+        for pred, index in zip(preds, indices):
+            img_info = self.img_infos[index]
+            if 'ann' not in img_info:
+                raise ValueError(
+                    f'Ground-truth depth for index {index} is unavailable.')
+
+            depth_map = osp.join(self.depth_path, img_info['ann']['depth_map'])
+            depth_map_gt = np.asarray(Image.open(depth_map),
+                                      dtype=np.float32) / self.depth_scale
+            depth_map_gt = np.expand_dims(depth_map_gt, axis=0)
+
+            eval_result = metrics(
+                depth_map_gt,
+                pred,
+                min_depth=self.min_depth,
+                max_depth=self.max_depth)
+            pre_eval_results.append(eval_result)
+            pre_eval_preds.append(pred)
+
+        return pre_eval_results, pre_eval_preds
 
     def evaluate(self, results, metric='eigen', logger=None, **kwargs):
-        pass
+        """Evaluate the dataset."""
+        metric = [
+            "a1", "a2", "a3", "abs_rel", "rmse", "log_10", "rmse_log",
+            "silog", "sq_rel"
+        ]
+        eval_results = {}
+
+        if mmcv.is_list_of(results, np.ndarray) or mmcv.is_list_of(results, str):
+            gt_depth_maps = self.get_gt_depth_maps()
+            ret_metrics = eval_metrics(gt_depth_maps, results)
+        else:
+            ret_metrics = pre_eval_to_metrics(results)
+
+        ret_metric_names = []
+        ret_metric_values = []
+        for ret_metric, ret_metric_value in ret_metrics.items():
+            ret_metric_names.append(ret_metric)
+            ret_metric_values.append(ret_metric_value)
+
+        num_table = len(ret_metrics) // 9
+        for i in range(num_table):
+            names = ret_metric_names[i * 9:i * 9 + 9]
+            values = ret_metric_values[i * 9:i * 9 + 9]
+
+            ret_metrics_summary = OrderedDict({
+                ret_metric: np.round(np.nanmean(ret_metric_value), 4)
+                for ret_metric, ret_metric_value in zip(names, values)
+            })
+
+            summary_table_data = PrettyTable()
+            for key, val in ret_metrics_summary.items():
+                summary_table_data.add_column(key, [val])
+
+            print_log('Summary:', logger)
+            print_log('\n' + summary_table_data.get_string(), logger=logger)
+
+        for key, value in ret_metrics.items():
+            eval_results[key] = value
+
+        return eval_results

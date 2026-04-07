@@ -2,8 +2,11 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-# from pytorch3d.loss import chamfer_distance
 from torch.nn.utils.rnn import pad_sequence
+try:
+    from pytorch3d.loss import chamfer_distance
+except ImportError:
+    chamfer_distance = None
 
 from depth.models.builder import LOSSES
 
@@ -24,6 +27,10 @@ class BinsChamferLoss(nn.Module):
         self.loss_weight = loss_weight
 
     def bins_chamfer_loss(self, bins, target_depth_maps):
+        if chamfer_distance is None:
+            raise ImportError(
+                'BinsChamferLoss requires pytorch3d. Please install pytorch3d '
+                'before training AdaBins.')
         bin_centers = 0.5 * (bins[:, 1:] + bins[:, :-1])
         n, p = bin_centers.shape
         input_points = bin_centers.view(n, p, 1)  # .shape = n, p, 1

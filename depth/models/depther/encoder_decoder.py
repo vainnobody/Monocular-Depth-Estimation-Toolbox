@@ -2,6 +2,7 @@ from depth.models import depther
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import copy
 
 from depth.core import add_prefix
 from depth.ops import resize
@@ -126,6 +127,60 @@ class DepthEncoderDecoder(BaseDepther):
 
         return depth_pred
 
+    def slide_inference(self, img, img_meta, rescale):
+        """Inference by sliding-window with overlap."""
+        h_stride, w_stride = self.test_cfg.stride
+        h_crop, w_crop = self.test_cfg.crop_size
+        batch_size, _, h_img, w_img = img.size()
+
+        preds = img.new_zeros((batch_size, 1, h_img, w_img))
+        count_mat = img.new_zeros((batch_size, 1, h_img, w_img))
+
+        h_grids = max(h_img - h_crop + h_stride - 1, 0) // h_stride + 1
+        w_grids = max(w_img - w_crop + w_stride - 1, 0) // w_stride + 1
+
+        for h_idx in range(h_grids):
+            for w_idx in range(w_grids):
+                y1 = h_idx * h_stride
+                x1 = w_idx * w_stride
+                y2 = min(y1 + h_crop, h_img)
+                x2 = min(x1 + w_crop, w_img)
+                y1 = max(y2 - h_crop, 0)
+                x1 = max(x2 - w_crop, 0)
+
+                crop_img = img[:, :, y1:y2, x1:x2]
+                crop_img_metas = copy.deepcopy(img_meta)
+                for crop_img_meta in crop_img_metas:
+                    crop_shape = crop_img.shape[2:] + (crop_img.shape[1], )
+                    crop_img_meta['img_shape'] = crop_shape
+                    crop_img_meta['pad_shape'] = crop_shape
+
+                crop_depth_pred = self.encode_decode(
+                    crop_img, crop_img_metas, rescale=True)
+
+                preds += F.pad(
+                    crop_depth_pred,
+                    (
+                        int(x1),
+                        int(preds.shape[3] - x2),
+                        int(y1),
+                        int(preds.shape[2] - y2),
+                    ))
+                count_mat[:, :, y1:y2, x1:x2] += 1
+
+        assert (count_mat == 0).sum() == 0
+        depth_pred = preds / count_mat
+
+        if rescale:
+            ori_shape = img_meta[0]['ori_shape']
+            depth_pred = resize(
+                input=depth_pred,
+                size=ori_shape[:2],
+                mode='bilinear',
+                align_corners=self.align_corners)
+
+        return depth_pred
+
     def inference(self, img, img_meta, rescale):
         """Inference with slide/whole style.
 
@@ -146,7 +201,7 @@ class DepthEncoderDecoder(BaseDepther):
         ori_shape = img_meta[0]['ori_shape']
         assert all(_['ori_shape'] == ori_shape for _ in img_meta)
         if self.test_cfg.mode == 'slide':
-            raise NotImplementedError
+            depth_pred = self.slide_inference(img, img_meta, rescale)
         else:
             depth_pred = self.whole_inference(img, img_meta, rescale)
         output = depth_pred
