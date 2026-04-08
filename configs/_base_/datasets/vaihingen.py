@@ -58,6 +58,8 @@ common_dataset_args = dict(
     max_depth=manual_max_depth,
     eval_min_depth=manual_min_depth,
     eval_max_depth=manual_max_depth,
+    relative_eval=True,
+    relative_eval_ref='median',
 )
 
 data = dict(
