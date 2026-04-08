@@ -6,6 +6,10 @@ _base_ = [
 ]
 
 norm_cfg = dict(type="BN", requires_grad=True)
+manual_min_depth = 250.0
+manual_max_depth = 300.0
+manual_eval_min_depth = 250.0
+manual_eval_max_depth = 300.0
 
 model = dict(
     backbone=dict(
@@ -32,6 +36,28 @@ model = dict(
         norm_cfg=norm_cfg,
     ),
     test_cfg=dict(mode="slide", crop_size=(512, 512), stride=(384, 384)),
+)
+
+data = dict(
+    train=dict(
+        dataset=dict(
+            min_depth=manual_min_depth,
+            max_depth=manual_max_depth,
+            eval_min_depth=manual_eval_min_depth,
+            eval_max_depth=manual_eval_max_depth,
+        )),
+    val=dict(
+        min_depth=manual_min_depth,
+        max_depth=manual_max_depth,
+        eval_min_depth=manual_eval_min_depth,
+        eval_max_depth=manual_eval_max_depth,
+    ),
+    test=dict(
+        min_depth=manual_min_depth,
+        max_depth=manual_max_depth,
+        eval_min_depth=manual_eval_min_depth,
+        eval_max_depth=manual_eval_max_depth,
+    ),
 )
 
 find_unused_parameters = True
