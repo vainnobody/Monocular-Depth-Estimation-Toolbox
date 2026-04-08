@@ -28,6 +28,14 @@ class LocalVisualizationHook(LoggerHook):
                 return value
         return None
 
+    @staticmethod
+    def _get_depth_range(runner):
+        model = runner.model.module if hasattr(runner.model, 'module') else runner.model
+        decode_head = getattr(model, 'decode_head', None)
+        if decode_head is None:
+            return None, None
+        return getattr(decode_head, 'min_depth', None), getattr(decode_head, 'max_depth', None)
+
     @master_only
     def before_run(self, runner):
         super(LocalVisualizationHook, self).before_run(runner)
@@ -52,10 +60,13 @@ class LocalVisualizationHook(LoggerHook):
         iter_id = self.get_iter(runner) + 1
         step_dir = self.run_dir / f'epoch_{epoch_id:04d}_iter_{iter_id:06d}'
         step_dir.mkdir(parents=True, exist_ok=True)
+        depth_vmin, depth_vmax = self._get_depth_range(runner)
 
         save_visualization_triplet(
             step_dir,
             prefix='train',
             img_rgb=self._get_image_value(log_images, 'img_rgb'),
             depth_pred=self._get_image_value(log_images, 'img_depth_pred'),
-            depth_gt=self._get_image_value(log_images, 'img_depth_gt'))
+            depth_gt=self._get_image_value(log_images, 'img_depth_gt'),
+            depth_vmin=depth_vmin,
+            depth_vmax=depth_vmax)

@@ -43,7 +43,7 @@ def prepare_rgb(value):
     return value
 
 
-def prepare_depth(value, cmap='magma_r'):
+def prepare_depth(value, cmap='magma_r', vmin=None, vmax=None):
     value = to_numpy(value).astype(np.float32)
     if value.ndim == 2:
         value = value[None, ...]
@@ -54,7 +54,7 @@ def prepare_depth(value, cmap='magma_r'):
     if value.ndim != 3:
         raise ValueError(f'Unsupported depth shape for visualization: {value.shape}')
 
-    colored = colorize(value, cmap=cmap)
+    colored = colorize(value, cmap=cmap, vmin=vmin, vmax=vmax)
     if colored.ndim == 4:
         colored = colored[0]
     return colored.astype(np.uint8)
@@ -72,7 +72,9 @@ def save_visualization_triplet(output_dir,
                                prefix,
                                img_rgb=None,
                                depth_pred=None,
-                               depth_gt=None):
+                               depth_gt=None,
+                               depth_vmin=None,
+                               depth_vmax=None):
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -80,9 +82,11 @@ def save_visualization_triplet(output_dir,
     if img_rgb is not None:
         prepared_images['img_rgb'] = prepare_rgb(img_rgb)
     if depth_pred is not None:
-        prepared_images['img_depth_pred'] = prepare_depth(depth_pred)
+        prepared_images['img_depth_pred'] = prepare_depth(
+            depth_pred, vmin=depth_vmin, vmax=depth_vmax)
     if depth_gt is not None:
-        prepared_images['img_depth_gt'] = prepare_depth(depth_gt)
+        prepared_images['img_depth_gt'] = prepare_depth(
+            depth_gt, vmin=depth_vmin, vmax=depth_vmax)
 
     safe_prefix = sanitize_name(prefix)
     for tag, image in prepared_images.items():

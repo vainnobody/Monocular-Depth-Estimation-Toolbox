@@ -60,6 +60,8 @@ def _save_eval_visualization(dataset,
     img_metas = data['img_metas'][0].data[0]
     imgs = tensor2imgs(img_tensor, **img_metas[0]['img_norm_cfg'])
     assert len(imgs) == len(img_metas) == len(batch_indices)
+    depth_vmin = getattr(dataset, 'eval_min_depth', None)
+    depth_vmax = getattr(dataset, 'eval_max_depth', None)
 
     for sample_img, sample_meta, sample_index, pred in zip(
             imgs, img_metas, batch_indices, result_depth):
@@ -83,7 +85,9 @@ def _save_eval_visualization(dataset,
             prefix=prefix,
             img_rgb=img_show,
             depth_pred=pred,
-            depth_gt=gt_depth)
+            depth_gt=gt_depth,
+            depth_vmin=depth_vmin,
+            depth_vmax=depth_vmax)
 
 def single_gpu_test(model,
                     data_loader,
