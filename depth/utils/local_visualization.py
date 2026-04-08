@@ -60,6 +60,15 @@ def prepare_depth(value, cmap='magma_r', vmin=None, vmax=None):
     return colored.astype(np.uint8)
 
 
+def infer_depth_range(value):
+    value = to_numpy(value).astype(np.float32)
+    valid_mask = np.isfinite(value) & (value > 0)
+    if not np.any(valid_mask):
+        return None, None
+    valid_value = value[valid_mask]
+    return float(valid_value.min()), float(valid_value.max())
+
+
 def resize_to_height(image, target_height):
     if image.shape[0] == target_height:
         return image
@@ -81,12 +90,14 @@ def save_visualization_triplet(output_dir,
     prepared_images = {}
     if img_rgb is not None:
         prepared_images['img_rgb'] = prepare_rgb(img_rgb)
+    gt_vmin, gt_vmax = infer_depth_range(depth_gt) if depth_gt is not None else (None, None)
     if depth_pred is not None:
+        pred_vmin = gt_vmin if gt_vmin is not None else depth_vmin
+        pred_vmax = gt_vmax if gt_vmax is not None else depth_vmax
         prepared_images['img_depth_pred'] = prepare_depth(
-            depth_pred, vmin=depth_vmin, vmax=depth_vmax)
+            depth_pred, vmin=pred_vmin, vmax=pred_vmax)
     if depth_gt is not None:
-        prepared_images['img_depth_gt'] = prepare_depth(
-            depth_gt, vmin=depth_vmin, vmax=depth_vmax)
+        prepared_images['img_depth_gt'] = prepare_depth(depth_gt)
 
     safe_prefix = sanitize_name(prefix)
     for tag, image in prepared_images.items():
