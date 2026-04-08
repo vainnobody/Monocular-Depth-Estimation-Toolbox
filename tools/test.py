@@ -1,5 +1,11 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import argparse
+import os.path as osp
+import sys
+
+REPO_ROOT = osp.dirname(osp.dirname(osp.abspath(__file__)))
+if REPO_ROOT not in sys.path:
+    sys.path.insert(0, REPO_ROOT)
 import os
 import shutil
 import warnings
