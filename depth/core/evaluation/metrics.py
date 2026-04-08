@@ -10,9 +10,11 @@ STANDARD_DEPTH_METRIC_NAMES = (
 
 
 def _mask_valid_depth(gt, pred, min_depth=1e-3, max_depth=80):
-    mask_1 = gt > min_depth
-    mask_2 = gt < max_depth
-    mask = np.logical_and(mask_1, mask_2)
+    mask = np.ones_like(gt, dtype=bool)
+    if min_depth is not None:
+        mask = np.logical_and(mask, gt > min_depth)
+    if max_depth is not None:
+        mask = np.logical_and(mask, gt < max_depth)
 
     gt = gt[mask]
     pred = pred[mask]
@@ -59,6 +61,9 @@ def _standard_metrics_dict(gt, pred):
 def _reference_height(values, mode='median'):
     if values.shape[0] == 0:
         return np.nan
+    if isinstance(mode, str) and mode.startswith('p'):
+        percentile = float(mode[1:])
+        return np.percentile(values, percentile)
     if mode == 'median':
         return np.median(values)
     if mode == 'mean':
