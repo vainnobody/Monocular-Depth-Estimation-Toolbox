@@ -80,6 +80,11 @@ log_config = dict(
     interval=50,
     hooks=[
         dict(type="TextLoggerHook", by_epoch=True),
-        dict(type='LocalVisualizationHook', by_epoch=True, out_dir='viz'),
+        dict(
+            type='LocalVisualizationHook',
+            by_epoch=True,
+            out_dir='viz',
+            interval=50,
+            ignore_last=False),
     ],
 )
