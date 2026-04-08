@@ -27,8 +27,8 @@ model = dict(
         in_channels=[96, 192, 384, 768],
         up_sample_channels=[128, 256, 512, 768],
         patch_size=8,
-        min_depth=250,
-        max_depth=300,
+        min_depth=recommended_min_depth,
+        max_depth=recommended_max_depth,
         norm_cfg=norm_cfg,
     ),
     test_cfg=dict(mode="slide", crop_size=(512, 512), stride=(384, 384)),
@@ -64,7 +64,15 @@ momentum_config = dict(policy="OneCycle")
 
 # runtime
 optimizer_config = dict(grad_clip=dict(max_norm=0.1, norm_type=2))
-evaluation = dict(interval=1)
+evaluation = dict(
+    by_epoch=True,
+    interval=1,
+    pre_eval=True,
+    rule='less',
+    save_best='abs_rel',
+    greater_keys=('a1', 'a2', 'a3'),
+    less_keys=('abs_rel', 'rmse'),
+)
 
 log_config = dict(
     interval=50,

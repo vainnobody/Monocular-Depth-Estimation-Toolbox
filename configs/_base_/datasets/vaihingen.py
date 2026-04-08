@@ -1,6 +1,11 @@
+from depth.utils import analyze_vaihingen_split_setup
+
 # dataset settings
 dataset_type = 'CustomDepthDataset'
 data_root = 'data/vaihingen'
+train_split = 'splits/vaihingen/train.txt'
+val_split = 'splits/vaihingen/val.txt'
+test_split = 'splits/vaihingen/test.txt'
 
 img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53],
@@ -43,14 +48,28 @@ test_pipeline = [
         ])
 ]
 
+vaihingen_diagnostics = analyze_vaihingen_split_setup(
+    data_root=data_root,
+    depth_dir='dsm',
+    train_split=train_split,
+    val_split=val_split,
+    default_min_depth=250,
+    default_max_depth=300,
+)
+
+recommended_min_depth = vaihingen_diagnostics['recommended_min_depth']
+recommended_max_depth = vaihingen_diagnostics['recommended_max_depth']
+
 common_dataset_args = dict(
     type=dataset_type,
     data_root=data_root,
     img_dir='image',
     depth_dir='dsm',
     depth_scale=1,
-    min_depth=250,
-    max_depth=300,
+    min_depth=recommended_min_depth,
+    max_depth=recommended_max_depth,
+    eval_min_depth=recommended_min_depth,
+    eval_max_depth=recommended_max_depth,
 )
 
 data = dict(
@@ -61,16 +80,16 @@ data = dict(
         times=train_repeat_times,
         dataset=dict(
             **common_dataset_args,
-            split='splits/vaihingen/train.txt',
+            split=train_split,
             test_mode=False,
             pipeline=train_pipeline)),
     val=dict(
         **common_dataset_args,
-        split='splits/vaihingen/val.txt',
+        split=val_split,
         test_mode=True,
         pipeline=test_pipeline),
     test=dict(
         **common_dataset_args,
-        split='splits/vaihingen/test.txt',
+        split=test_split,
         test_mode=True,
         pipeline=test_pipeline))

@@ -55,7 +55,9 @@ class CustomDepthDataset(Dataset):
                  depth_scale=1,
                  img_dir='rgb',
                  depth_dir='depth',
-                 split=None):
+                 split=None,
+                 eval_min_depth=None,
+                 eval_max_depth=None):
 
         self.pipeline = Compose(pipeline)
         self.data_root = data_root
@@ -65,6 +67,8 @@ class CustomDepthDataset(Dataset):
         self.test_mode = test_mode
         self.min_depth = min_depth
         self.max_depth = max_depth
+        self.eval_min_depth = min_depth if eval_min_depth is None else eval_min_depth
+        self.eval_max_depth = max_depth if eval_max_depth is None else eval_max_depth
         self.depth_scale = depth_scale
 
         # load annotations
@@ -245,8 +249,8 @@ class CustomDepthDataset(Dataset):
             eval_result = metrics(
                 depth_map_gt,
                 pred,
-                min_depth=self.min_depth,
-                max_depth=self.max_depth)
+                min_depth=self.eval_min_depth,
+                max_depth=self.eval_max_depth)
             pre_eval_results.append(eval_result)
             pre_eval_preds.append(pred)
 
