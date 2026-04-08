@@ -1,11 +1,11 @@
-from depth.utils import analyze_vaihingen_split_setup
-
 # dataset settings
 dataset_type = 'CustomDepthDataset'
 data_root = 'data/vaihingen'
 train_split = 'splits/vaihingen/train.txt'
 val_split = 'splits/vaihingen/val.txt'
 test_split = 'splits/vaihingen/test.txt'
+manual_min_depth = 250.0
+manual_max_depth = 300.0
 
 img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53],
@@ -48,30 +48,16 @@ test_pipeline = [
         ])
 ]
 
-_vaihingen_diagnostics = analyze_vaihingen_split_setup(
-    data_root=data_root,
-    depth_dir='dsm',
-    train_split=train_split,
-    val_split=val_split,
-    default_min_depth=250,
-    default_max_depth=300,
-)
-
-recommended_min_depth = _vaihingen_diagnostics['recommended_min_depth']
-recommended_max_depth = _vaihingen_diagnostics['recommended_max_depth']
-del analyze_vaihingen_split_setup
-del _vaihingen_diagnostics
-
 common_dataset_args = dict(
     type=dataset_type,
     data_root=data_root,
     img_dir='image',
     depth_dir='dsm',
     depth_scale=1,
-    min_depth=recommended_min_depth,
-    max_depth=recommended_max_depth,
-    eval_min_depth=recommended_min_depth,
-    eval_max_depth=recommended_max_depth,
+    min_depth=manual_min_depth,
+    max_depth=manual_max_depth,
+    eval_min_depth=manual_min_depth,
+    eval_max_depth=manual_max_depth,
 )
 
 data = dict(
