@@ -19,6 +19,15 @@ class LocalVisualizationHook(LoggerHook):
         self.out_dir = out_dir
         self.run_dir = None
 
+    @staticmethod
+    def _get_image_value(log_images, target_key):
+        if target_key in log_images:
+            return log_images[target_key]
+        for key, value in log_images.items():
+            if key.endswith(f'.{target_key}') or key.endswith(target_key):
+                return value
+        return None
+
     @master_only
     def before_run(self, runner):
         super(LocalVisualizationHook, self).before_run(runner)
@@ -47,6 +56,6 @@ class LocalVisualizationHook(LoggerHook):
         save_visualization_triplet(
             step_dir,
             prefix='train',
-            img_rgb=log_images.get('img_rgb'),
-            depth_pred=log_images.get('img_depth_pred'),
-            depth_gt=log_images.get('img_depth_gt'))
+            img_rgb=self._get_image_value(log_images, 'img_rgb'),
+            depth_pred=self._get_image_value(log_images, 'img_depth_pred'),
+            depth_gt=self._get_image_value(log_images, 'img_depth_gt'))
