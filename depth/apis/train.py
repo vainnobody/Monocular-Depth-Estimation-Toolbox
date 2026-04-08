@@ -7,6 +7,7 @@ import torch
 from mmcv.parallel import MMDataParallel, MMDistributedDataParallel
 from mmcv.runner import build_optimizer, build_runner
 
+import depth.models.utils  # noqa: F401
 from depth.core import DistEvalHook, EvalHook
 from depth.datasets import build_dataloader, build_dataset
 from depth.utils import get_root_logger

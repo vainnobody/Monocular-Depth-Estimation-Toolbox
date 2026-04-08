@@ -214,16 +214,22 @@ class CustomDepthDataset(Dataset):
         results[0] = (results[0] * self.depth_scale) # Do not convert to np.uint16 for ensembling. # .astype(np.uint16)
         return results
 
+    def load_gt_depth_map(self, idx, expand_dim=True):
+        img_info = self.img_infos[idx]
+        if 'ann' not in img_info:
+            raise ValueError(f'Ground-truth depth for index {idx} is unavailable.')
+
+        depth_map = osp.join(self.depth_path, img_info['ann']['depth_map'])
+        depth_map_gt = np.asarray(Image.open(depth_map),
+                                  dtype=np.float32) / self.depth_scale
+        if expand_dim:
+            depth_map_gt = np.expand_dims(depth_map_gt, axis=0)
+        return depth_map_gt
+
     def get_gt_depth_maps(self):
         """Get ground truth depth maps for evaluation."""
-        for img_info in self.img_infos:
-            if 'ann' not in img_info:
-                raise ValueError(
-                    'Ground-truth depth is unavailable for this dataset split.')
-            depth_map = osp.join(self.depth_path, img_info['ann']['depth_map'])
-            depth_map_gt = np.asarray(Image.open(depth_map),
-                                      dtype=np.float32) / self.depth_scale
-            yield np.expand_dims(depth_map_gt, axis=0)
+        for idx, _ in enumerate(self.img_infos):
+            yield self.load_gt_depth_map(idx, expand_dim=True)
 
     def pre_eval(self, preds, indices):
         """Collect evaluation results from each iteration."""
@@ -236,15 +242,7 @@ class CustomDepthDataset(Dataset):
         pre_eval_preds = []
 
         for pred, index in zip(preds, indices):
-            img_info = self.img_infos[index]
-            if 'ann' not in img_info:
-                raise ValueError(
-                    f'Ground-truth depth for index {index} is unavailable.')
-
-            depth_map = osp.join(self.depth_path, img_info['ann']['depth_map'])
-            depth_map_gt = np.asarray(Image.open(depth_map),
-                                      dtype=np.float32) / self.depth_scale
-            depth_map_gt = np.expand_dims(depth_map_gt, axis=0)
+            depth_map_gt = self.load_gt_depth_map(index, expand_dim=True)
 
             eval_result = metrics(
                 depth_map_gt,

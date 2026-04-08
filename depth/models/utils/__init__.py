@@ -9,7 +9,7 @@ from .self_attention_block import SelfAttentionBlock
 from .shape_convert import nchw_to_nlc, nlc_to_nchw
 from .up_conv_block import UpConvBlock, BasicConvBlock
 from .logger import get_root_logger
-from .hooks import TensorboardImageLoggerHook
+from .hooks import TensorboardImageLoggerHook, LocalVisualizationHook
 from .transformer import PixelTransformerDecoder, PixelTransformerDecoderLayer, PureMSDEnTransformer
 
 __all__ = [
@@ -17,6 +17,7 @@ __all__ = [
     'UpConvBlock', 'InvertedResidualV3', 'SELayer', 'vit_convert',
     'swin_convert', 'PatchEmbed', 'PatchEmbedSwin', 'nchw_to_nlc', 
     'nlc_to_nchw', 'BasicConvBlock', 'get_root_logger', 
-    'PixelTransformerDecoder', 'PixelTransformerDecoderLayer', 
-    'PureMSDEnTransformer'
+    'PixelTransformerDecoder', 'PixelTransformerDecoderLayer',
+    'PureMSDEnTransformer', 'TensorboardImageLoggerHook',
+    'LocalVisualizationHook'
 ]

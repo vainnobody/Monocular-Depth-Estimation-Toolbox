@@ -4,6 +4,7 @@ log_config = dict(
     hooks=[
         dict(type='TextLoggerHook', by_epoch=True),
         dict(type='TensorboardImageLoggerHook', by_epoch=True),
+        dict(type='LocalVisualizationHook', by_epoch=True, out_dir='viz'),
     ])
 # yapf:enable
 dist_params = dict(backend='nccl')

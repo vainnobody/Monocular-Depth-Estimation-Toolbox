@@ -2,6 +2,7 @@
 import os.path as osp
 import tempfile
 import warnings
+from pathlib import Path
 
 import mmcv
 import numpy as np
@@ -9,6 +10,8 @@ import torch
 from mmcv.engine import collect_results_cpu, collect_results_gpu
 from mmcv.image import tensor2imgs
 from mmcv.runner import get_dist_info
+
+from depth.utils.local_visualization import save_visualization_triplet, sanitize_name
 
 def np2tmp(array, temp_file_name=None, tmpdir=None):
     """Save ndarray to local numpy file.
@@ -36,13 +39,60 @@ def replace_str(s):
     new_str = s.replace('/', '_')
     return new_str
 
+
+def _prepare_eval_viz_dir(save_dir, index):
+    if save_dir is None:
+        return None
+    step_dir = Path(save_dir) / f'sample_{int(index):06d}'
+    step_dir.mkdir(parents=True, exist_ok=True)
+    return step_dir
+
+
+def _save_eval_visualization(dataset,
+                             data,
+                             batch_indices,
+                             result_depth,
+                             save_dir):
+    if save_dir is None:
+        return
+
+    img_tensor = data['img'][0]
+    img_metas = data['img_metas'][0].data[0]
+    imgs = tensor2imgs(img_tensor, **img_metas[0]['img_norm_cfg'])
+    assert len(imgs) == len(img_metas) == len(batch_indices)
+
+    for sample_img, sample_meta, sample_index, pred in zip(
+            imgs, img_metas, batch_indices, result_depth):
+        h, w, _ = sample_meta['img_shape']
+        img_show = sample_img[:h, :w, :]
+        ori_h, ori_w = sample_meta['ori_shape'][:-1]
+        img_show = mmcv.imresize(img_show, (ori_w, ori_h))
+
+        gt_depth = None
+        if hasattr(dataset, 'load_gt_depth_map'):
+            try:
+                gt_depth = dataset.load_gt_depth_map(sample_index, expand_dim=False)
+            except Exception:
+                gt_depth = None
+
+        sample_dir = _prepare_eval_viz_dir(save_dir, sample_index)
+        prefix = sanitize_name(
+            f'{sample_index:06d}_{osp.splitext(osp.basename(sample_meta["ori_filename"]))[0]}')
+        save_visualization_triplet(
+            sample_dir,
+            prefix=prefix,
+            img_rgb=img_show,
+            depth_pred=pred,
+            depth_gt=gt_depth)
+
 def single_gpu_test(model,
                     data_loader,
                     show=False,
                     out_dir=None,
                     pre_eval=False,
                     format_only=False,
-                    format_args={}):
+                    format_args={},
+                    save_viz_dir=None):
     """Test with single GPU by progressive mode.
 
     Args:
@@ -98,6 +148,14 @@ def single_gpu_test(model,
             result, result_depth = dataset.pre_eval(result_depth,
                                                     indices=batch_indices)
 
+        if save_viz_dir:
+            _save_eval_visualization(
+                dataset=dataset,
+                data=data,
+                batch_indices=batch_indices,
+                result_depth=result_depth,
+                save_dir=save_viz_dir)
+
         # if format only, result will be formated output
         # if pre_eval, result will be pre_eval res for final aggregation
         results.extend(result)
@@ -146,7 +204,8 @@ def multi_gpu_test(model,
                    gpu_collect=False,
                    pre_eval=False,
                    format_only=False,
-                   format_args={}):
+                   format_args={},
+                   save_viz_dir=None):
     """Test model with multiple gpus by progressive mode.
 
     This method tests model with multiple gpus and collects the results
@@ -210,7 +269,17 @@ def multi_gpu_test(model,
         if pre_eval:
             # TODO: adapt samples_per_gpu > 1.
             # only samples_per_gpu=1 valid now
-            result, _ = dataset.pre_eval(result, indices=batch_indices)
+            result, result_depth = dataset.pre_eval(result, indices=batch_indices)
+        else:
+            result_depth = result
+
+        if save_viz_dir is not None and rank == 0:
+            _save_eval_visualization(
+                dataset=dataset,
+                data=data,
+                batch_indices=batch_indices,
+                result_depth=result_depth,
+                save_dir=Path(save_viz_dir) / 'rank0')
 
         results.extend(result)
 

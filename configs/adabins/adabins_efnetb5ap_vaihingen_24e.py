@@ -68,6 +68,8 @@ evaluation = dict(
     by_epoch=True,
     interval=1,
     pre_eval=True,
+    save_viz=True,
+    viz_dir='viz',
     rule='less',
     save_best='abs_rel',
     greater_keys=('a1', 'a2', 'a3'),
@@ -78,5 +80,6 @@ log_config = dict(
     interval=50,
     hooks=[
         dict(type="TextLoggerHook", by_epoch=True),
+        dict(type='LocalVisualizationHook', by_epoch=True, out_dir='viz'),
     ],
 )
