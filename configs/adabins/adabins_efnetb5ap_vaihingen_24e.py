@@ -38,15 +38,15 @@ find_unused_parameters = True
 SyncBN = True
 
 # optimizer
-max_lr = 1e-4
+max_lr = 5e-5
 optimizer = dict(
     type="AdamW",
     lr=max_lr,
     weight_decay=0.1,
     paramwise_cfg=dict(
         custom_keys={
-            "backbone": dict(lr_mult=0.1),
-            "decode_head": dict(lr_mult=10),
+            "backbone": dict(lr_mult=1.0),
+            "decode_head": dict(lr_mult=40),
         }
     ),
 )
@@ -69,11 +69,11 @@ evaluation = dict(
     interval=1,
     pre_eval=True,
     save_viz=True,
-    viz_dir='viz',
-    rule='less',
-    save_best='abs_rel',
-    greater_keys=('a1', 'a2', 'a3'),
-    less_keys=('abs_rel', 'rmse'),
+    viz_dir="viz",
+    rule="less",
+    save_best="abs_rel",
+    greater_keys=("a1", "a2", "a3"),
+    less_keys=("abs_rel", "rmse"),
 )
 
 log_config = dict(
@@ -81,10 +81,11 @@ log_config = dict(
     hooks=[
         dict(type="TextLoggerHook", by_epoch=True),
         dict(
-            type='LocalVisualizationHook',
+            type="LocalVisualizationHook",
             by_epoch=True,
-            out_dir='viz',
+            out_dir="viz",
             interval=50,
-            ignore_last=False),
+            ignore_last=False,
+        ),
     ],
 )
