@@ -48,7 +48,7 @@ test_pipeline = [
         ])
 ]
 
-vaihingen_diagnostics = analyze_vaihingen_split_setup(
+_vaihingen_diagnostics = analyze_vaihingen_split_setup(
     data_root=data_root,
     depth_dir='dsm',
     train_split=train_split,
@@ -57,8 +57,10 @@ vaihingen_diagnostics = analyze_vaihingen_split_setup(
     default_max_depth=300,
 )
 
-recommended_min_depth = vaihingen_diagnostics['recommended_min_depth']
-recommended_max_depth = vaihingen_diagnostics['recommended_max_depth']
+recommended_min_depth = _vaihingen_diagnostics['recommended_min_depth']
+recommended_max_depth = _vaihingen_diagnostics['recommended_max_depth']
+del analyze_vaihingen_split_setup
+del _vaihingen_diagnostics
 
 common_dataset_args = dict(
     type=dataset_type,
