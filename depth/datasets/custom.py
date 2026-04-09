@@ -7,8 +7,7 @@ from mmcv.utils import print_log
 from prettytable import PrettyTable
 from torch.utils.data import Dataset
 
-from depth.core import (eval_metrics, metrics, pre_eval_to_metrics,
-                        relative_height_metrics)
+from depth.core import pre_eval_to_metrics, metrics, eval_metrics
 from depth.utils import get_root_logger
 from depth.datasets.builder import DATASETS
 from depth.datasets.pipelines import Compose
@@ -58,9 +57,7 @@ class CustomDepthDataset(Dataset):
                  depth_dir='depth',
                  split=None,
                  eval_min_depth=None,
-                 eval_max_depth=None,
-                 relative_eval=False,
-                 relative_eval_ref='median'):
+                 eval_max_depth=None):
 
         self.pipeline = Compose(pipeline)
         self.data_root = data_root
@@ -72,8 +69,6 @@ class CustomDepthDataset(Dataset):
         self.max_depth = max_depth
         self.eval_min_depth = min_depth if eval_min_depth is None else eval_min_depth
         self.eval_max_depth = max_depth if eval_max_depth is None else eval_max_depth
-        self.relative_eval = relative_eval
-        self.relative_eval_ref = relative_eval_ref
         self.depth_scale = depth_scale
 
         # load annotations
@@ -236,25 +231,6 @@ class CustomDepthDataset(Dataset):
         for idx, _ in enumerate(self.img_infos):
             yield self.load_gt_depth_map(idx, expand_dim=True)
 
-    def _compute_metrics(self, depth_map_gt, pred):
-        if isinstance(pred, str):
-            pred = np.load(pred)
-        eval_result = metrics(
-            depth_map_gt,
-            pred,
-            min_depth=self.eval_min_depth,
-            max_depth=self.eval_max_depth,
-            as_dict=True)
-        if self.relative_eval:
-            eval_result.update(
-                relative_height_metrics(
-                    depth_map_gt,
-                    pred,
-                    min_depth=self.eval_min_depth,
-                    max_depth=self.eval_max_depth,
-                    reference=self.relative_eval_ref))
-        return eval_result
-
     def pre_eval(self, preds, indices):
         """Collect evaluation results from each iteration."""
         if not isinstance(indices, list):
@@ -267,7 +243,12 @@ class CustomDepthDataset(Dataset):
 
         for pred, index in zip(preds, indices):
             depth_map_gt = self.load_gt_depth_map(index, expand_dim=True)
-            eval_result = self._compute_metrics(depth_map_gt, pred)
+
+            eval_result = metrics(
+                depth_map_gt,
+                pred,
+                min_depth=self.eval_min_depth,
+                max_depth=self.eval_max_depth)
             pre_eval_results.append(eval_result)
             pre_eval_preds.append(pred)
 
@@ -275,13 +256,15 @@ class CustomDepthDataset(Dataset):
 
     def evaluate(self, results, metric='eigen', logger=None, **kwargs):
         """Evaluate the dataset."""
+        metric = [
+            "a1", "a2", "a3", "abs_rel", "rmse", "log_10", "rmse_log",
+            "silog", "sq_rel"
+        ]
         eval_results = {}
 
         if mmcv.is_list_of(results, np.ndarray) or mmcv.is_list_of(results, str):
-            per_image_metrics = []
-            for depth_map_gt, pred in zip(self.get_gt_depth_maps(), results):
-                per_image_metrics.append(self._compute_metrics(depth_map_gt, pred))
-            ret_metrics = pre_eval_to_metrics(per_image_metrics)
+            gt_depth_maps = self.get_gt_depth_maps()
+            ret_metrics = eval_metrics(gt_depth_maps, results)
         else:
             ret_metrics = pre_eval_to_metrics(results)
 
@@ -291,9 +274,10 @@ class CustomDepthDataset(Dataset):
             ret_metric_names.append(ret_metric)
             ret_metric_values.append(ret_metric_value)
 
-        for start in range(0, len(ret_metrics), 9):
-            names = ret_metric_names[start:start + 9]
-            values = ret_metric_values[start:start + 9]
+        num_table = len(ret_metrics) // 9
+        for i in range(num_table):
+            names = ret_metric_names[i * 9:i * 9 + 9]
+            values = ret_metric_values[i * 9:i * 9 + 9]
 
             ret_metrics_summary = OrderedDict({
                 ret_metric: np.round(np.nanmean(ret_metric_value), 4)
