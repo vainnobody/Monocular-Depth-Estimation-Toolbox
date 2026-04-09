@@ -60,10 +60,7 @@ class CustomDepthDataset(Dataset):
                  eval_min_depth=None,
                  eval_max_depth=None,
                  relative_eval=False,
-                 relative_eval_ref='median',
-                 standard_metrics_on_relative=False,
-                 relative_metric_min_depth=1.0,
-                 relative_metric_max_depth=None):
+                 relative_eval_ref='median'):
 
         self.pipeline = Compose(pipeline)
         self.data_root = data_root
@@ -77,9 +74,6 @@ class CustomDepthDataset(Dataset):
         self.eval_max_depth = max_depth if eval_max_depth is None else eval_max_depth
         self.relative_eval = relative_eval
         self.relative_eval_ref = relative_eval_ref
-        self.standard_metrics_on_relative = standard_metrics_on_relative
-        self.relative_metric_min_depth = relative_metric_min_depth
-        self.relative_metric_max_depth = relative_metric_max_depth
         self.depth_scale = depth_scale
 
         # load annotations
@@ -242,49 +236,14 @@ class CustomDepthDataset(Dataset):
         for idx, _ in enumerate(self.img_infos):
             yield self.load_gt_depth_map(idx, expand_dim=True)
 
-    def _to_relative_depth(self, depth_map_gt, pred, eps=1e-3):
-        abs_mask = np.ones_like(depth_map_gt, dtype=bool)
-        if self.eval_min_depth is not None:
-            abs_mask = np.logical_and(abs_mask, depth_map_gt > self.eval_min_depth)
-        if self.eval_max_depth is not None:
-            abs_mask = np.logical_and(abs_mask, depth_map_gt < self.eval_max_depth)
-
-        valid_gt = depth_map_gt[abs_mask]
-        if valid_gt.size == 0:
-            return depth_map_gt, pred
-
-        if isinstance(self.relative_eval_ref, str) and self.relative_eval_ref.startswith('p'):
-            percentile = float(self.relative_eval_ref[1:])
-            base_height = np.percentile(valid_gt, percentile)
-        elif self.relative_eval_ref == 'median':
-            base_height = np.median(valid_gt)
-        elif self.relative_eval_ref == 'mean':
-            base_height = np.mean(valid_gt)
-        elif self.relative_eval_ref == 'min':
-            base_height = np.min(valid_gt)
-        else:
-            raise ValueError(f'Unsupported relative_eval_ref: {self.relative_eval_ref}')
-
-        depth_map_gt = np.maximum(depth_map_gt - base_height, eps)
-        pred = np.maximum(pred - base_height, eps)
-        return depth_map_gt, pred
-
     def _compute_metrics(self, depth_map_gt, pred):
         if isinstance(pred, str):
             pred = np.load(pred)
-        metric_gt = depth_map_gt
-        metric_pred = pred
-        metric_min_depth = self.eval_min_depth
-        metric_max_depth = self.eval_max_depth
-        if self.standard_metrics_on_relative:
-            metric_gt, metric_pred = self._to_relative_depth(depth_map_gt, pred)
-            metric_min_depth = self.relative_metric_min_depth
-            metric_max_depth = self.relative_metric_max_depth
         eval_result = metrics(
-            metric_gt,
-            metric_pred,
-            min_depth=metric_min_depth,
-            max_depth=metric_max_depth,
+            depth_map_gt,
+            pred,
+            min_depth=self.eval_min_depth,
+            max_depth=self.eval_max_depth,
             as_dict=True)
         if self.relative_eval:
             eval_result.update(
