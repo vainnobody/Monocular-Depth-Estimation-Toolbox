@@ -78,6 +78,18 @@ class DepthLoadAnnotations(object):
         depth_gt = np.asarray(Image.open(filename),
                               dtype=np.float32) / results['depth_scale']
 
+        if results.get('normalize_depth', False):
+            valid_mask = np.isfinite(depth_gt) & (depth_gt > 0)
+            if np.any(valid_mask):
+                src_min = float(results['depth_normalize_min'])
+                src_max = float(results['depth_normalize_max'])
+                dst_min = float(results.get('depth_norm_min', 1e-3))
+                dst_max = float(results.get('depth_norm_max', 1.0))
+                scale = (dst_max - dst_min) / max(src_max - src_min, 1e-12)
+                clipped = np.clip(depth_gt[valid_mask], src_min, src_max)
+                depth_gt = depth_gt.copy()
+                depth_gt[valid_mask] = (clipped - src_min) * scale + dst_min
+
         results['depth_gt'] = depth_gt
         results['depth_ori_shape'] = depth_gt.shape
 

@@ -57,7 +57,12 @@ class CustomDepthDataset(Dataset):
                  depth_dir='depth',
                  split=None,
                  eval_min_depth=None,
-                 eval_max_depth=None):
+                 eval_max_depth=None,
+                 normalize_depth=False,
+                 depth_normalize_min=None,
+                 depth_normalize_max=None,
+                 depth_norm_min=1e-3,
+                 depth_norm_max=1.0):
 
         self.pipeline = Compose(pipeline)
         self.data_root = data_root
@@ -70,6 +75,11 @@ class CustomDepthDataset(Dataset):
         self.eval_min_depth = min_depth if eval_min_depth is None else eval_min_depth
         self.eval_max_depth = max_depth if eval_max_depth is None else eval_max_depth
         self.depth_scale = depth_scale
+        self.normalize_depth = normalize_depth
+        self.depth_normalize_min = min_depth if depth_normalize_min is None else depth_normalize_min
+        self.depth_normalize_max = max_depth if depth_normalize_max is None else depth_normalize_max
+        self.depth_norm_min = depth_norm_min
+        self.depth_norm_max = depth_norm_max
 
         # load annotations
         self.img_infos = self.load_annotations(self.img_path, self.depth_path,
@@ -155,6 +165,11 @@ class CustomDepthDataset(Dataset):
         results['img_prefix'] = self.img_path
         results['depth_prefix'] = self.depth_path
         results['depth_scale'] = self.depth_scale
+        results['normalize_depth'] = self.normalize_depth
+        results['depth_normalize_min'] = self.depth_normalize_min
+        results['depth_normalize_max'] = self.depth_normalize_max
+        results['depth_norm_min'] = self.depth_norm_min
+        results['depth_norm_max'] = self.depth_norm_max
 
     def __getitem__(self, idx):
         """Get training/test data after pipeline.
@@ -223,9 +238,30 @@ class CustomDepthDataset(Dataset):
         depth_map = osp.join(self.depth_path, img_info['ann']['depth_map'])
         depth_map_gt = np.asarray(Image.open(depth_map),
                                   dtype=np.float32) / self.depth_scale
+        depth_map_gt = self._normalize_depth_map(depth_map_gt)
         if expand_dim:
             depth_map_gt = np.expand_dims(depth_map_gt, axis=0)
         return depth_map_gt
+
+    def _normalize_depth_map(self, depth_map):
+        if not self.normalize_depth:
+            return depth_map
+
+        depth_map = np.asarray(depth_map, dtype=np.float32)
+        normalized = depth_map.copy()
+        valid_mask = np.isfinite(depth_map) & (depth_map > 0)
+        if not np.any(valid_mask):
+            return normalized
+
+        src_min = float(self.depth_normalize_min)
+        src_max = float(self.depth_normalize_max)
+        dst_min = float(self.depth_norm_min)
+        dst_max = float(self.depth_norm_max)
+        scale = (dst_max - dst_min) / max(src_max - src_min, 1e-12)
+
+        clipped = np.clip(depth_map[valid_mask], src_min, src_max)
+        normalized[valid_mask] = (clipped - src_min) * scale + dst_min
+        return normalized
 
     def get_gt_depth_maps(self):
         """Get ground truth depth maps for evaluation."""
