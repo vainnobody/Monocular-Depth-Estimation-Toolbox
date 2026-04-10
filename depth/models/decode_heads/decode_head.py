@@ -130,8 +130,14 @@ class DepthBaseDecodeHead(BaseModule, metaclass=ABCMeta):
         """
         depth_pred = self.forward(inputs, img_metas)
         losses = self.losses(depth_pred, depth_gt)
+        depth_vis = resize(
+            input=depth_pred,
+            size=depth_gt.shape[2:],
+            mode='bilinear',
+            align_corners=self.align_corners,
+            warning=False)
 
-        log_imgs = self.log_images(img[0], depth_pred[0], depth_gt[0], img_metas[0])
+        log_imgs = self.log_images(img[0], depth_vis[0], depth_gt[0], img_metas[0])
         losses.update(**log_imgs)
 
         return losses

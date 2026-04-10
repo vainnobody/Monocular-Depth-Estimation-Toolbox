@@ -407,7 +407,7 @@ class BinsFormerDecodeHead(DepthBaseDecodeHead):
 
         losses["loss_depth"] = depth_loss
 
-        log_imgs = self.log_images(img[0], pred_depths[0], depth_gt[0], img_metas[0])
+        log_imgs = self.log_images(img[0], depth[0], depth_gt[0], img_metas[0])
         losses.update(**log_imgs)
 
         return losses
