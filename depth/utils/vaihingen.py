@@ -97,8 +97,8 @@ def analyze_vaihingen_split_setup(
     valid_min_depth: float = 0.0,
     lower_percentile: float = 0.1,
     upper_percentile: float = 99.9,
-    default_min_depth: float = 250.0,
-    default_max_depth: float = 300.0,
+    default_min_depth: float = 1e-3,
+    default_max_depth: float = 500.0,
     cache_path: Optional[str] = None,
     verbose: bool = True,
 ) -> Dict[str, object]:

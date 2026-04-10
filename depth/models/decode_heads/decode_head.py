@@ -211,9 +211,8 @@ class DepthBaseDecodeHead(BaseModule, metaclass=ABCMeta):
         show_img = show_img.transpose(0, 2, 1)
         show_img = show_img.transpose(1, 0, 2)
 
-        depth_pred = depth_pred / torch.max(depth_pred)
-        depth_gt = depth_gt / torch.max(depth_gt)
-
+        # Keep raw depth values for visualization so saved color maps use the
+        # dataset-level depth range instead of per-image normalization.
         depth_pred_color = copy.deepcopy(depth_pred.detach().cpu())
         depth_gt_color = copy.deepcopy(depth_gt.detach().cpu())
 

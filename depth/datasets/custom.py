@@ -74,6 +74,7 @@ class CustomDepthDataset(Dataset):
         # load annotations
         self.img_infos = self.load_annotations(self.img_path, self.depth_path,
                                                self.split)
+        self._pre_eval_diagnostics = []
         
 
     def __len__(self):
@@ -231,6 +232,98 @@ class CustomDepthDataset(Dataset):
         for idx, _ in enumerate(self.img_infos):
             yield self.load_gt_depth_map(idx, expand_dim=True)
 
+    def _collect_pre_eval_diagnostics(self, depth_map_gt, pred):
+        depth_map_gt = np.asarray(depth_map_gt, dtype=np.float32)
+        pred = np.asarray(pred, dtype=np.float32)
+        if pred.shape != depth_map_gt.shape:
+            pred = np.reshape(pred, depth_map_gt.shape)
+
+        valid_mask = np.logical_and(depth_map_gt > self.eval_min_depth,
+                                    depth_map_gt < self.eval_max_depth)
+        total_pixels = int(valid_mask.size)
+        valid_pixels = int(valid_mask.sum())
+        valid_ratio = float(valid_pixels / total_pixels) if total_pixels > 0 else 0.0
+
+        diagnostic = dict(
+            valid_ratio=valid_ratio,
+            valid_pixels=valid_pixels,
+            total_pixels=total_pixels,
+        )
+
+        if valid_pixels == 0:
+            diagnostic.update(
+                gt_min=np.nan,
+                gt_p1=np.nan,
+                gt_p99=np.nan,
+                gt_max=np.nan,
+                pred_min=np.nan,
+                pred_p1=np.nan,
+                pred_p99=np.nan,
+                pred_max=np.nan)
+            return diagnostic
+
+        gt_valid = depth_map_gt[valid_mask]
+        pred_valid = pred[valid_mask]
+        gt_percentiles = np.percentile(gt_valid, [1.0, 99.0])
+        pred_percentiles = np.percentile(pred_valid, [1.0, 99.0])
+        diagnostic.update(
+            gt_min=float(gt_valid.min()),
+            gt_p1=float(gt_percentiles[0]),
+            gt_p99=float(gt_percentiles[1]),
+            gt_max=float(gt_valid.max()),
+            pred_min=float(pred_valid.min()),
+            pred_p1=float(pred_percentiles[0]),
+            pred_p99=float(pred_percentiles[1]),
+            pred_max=float(pred_valid.max()))
+        return diagnostic
+
+    def _summarize_pre_eval_diagnostics(self, logger=None):
+        if not self._pre_eval_diagnostics:
+            return
+
+        diagnostics = self._pre_eval_diagnostics
+        valid_ratios = np.array([item['valid_ratio'] for item in diagnostics], dtype=np.float32)
+        valid_pixels = np.array([item['valid_pixels'] for item in diagnostics], dtype=np.float32)
+        total_pixels = np.array([item['total_pixels'] for item in diagnostics], dtype=np.float32)
+
+        def _summary(key):
+            values = np.array([item[key] for item in diagnostics], dtype=np.float32)
+            return float(np.nanmean(values))
+
+        summary_table_data = PrettyTable()
+        summary_table_data.add_column('diag', [
+            'valid_ratio_mean',
+            'valid_ratio_min',
+            'valid_pixels_mean',
+            'total_pixels_mean',
+            'gt_min_mean',
+            'gt_p1_mean',
+            'gt_p99_mean',
+            'gt_max_mean',
+            'pred_min_mean',
+            'pred_p1_mean',
+            'pred_p99_mean',
+            'pred_max_mean',
+        ])
+        summary_table_data.add_column('value', [
+            np.round(float(np.nanmean(valid_ratios)), 6),
+            np.round(float(np.nanmin(valid_ratios)), 6),
+            np.round(float(np.nanmean(valid_pixels)), 2),
+            np.round(float(np.nanmean(total_pixels)), 2),
+            np.round(_summary('gt_min'), 4),
+            np.round(_summary('gt_p1'), 4),
+            np.round(_summary('gt_p99'), 4),
+            np.round(_summary('gt_max'), 4),
+            np.round(_summary('pred_min'), 4),
+            np.round(_summary('pred_p1'), 4),
+            np.round(_summary('pred_p99'), 4),
+            np.round(_summary('pred_max'), 4),
+        ])
+
+        print_log('Pre-eval diagnostics:', logger)
+        print_log('\n' + summary_table_data.get_string(), logger=logger)
+        self._pre_eval_diagnostics = []
+
     def pre_eval(self, preds, indices):
         """Collect evaluation results from each iteration."""
         if not isinstance(indices, list):
@@ -243,6 +336,8 @@ class CustomDepthDataset(Dataset):
 
         for pred, index in zip(preds, indices):
             depth_map_gt = self.load_gt_depth_map(index, expand_dim=True)
+            self._pre_eval_diagnostics.append(
+                self._collect_pre_eval_diagnostics(depth_map_gt, pred))
 
             eval_result = metrics(
                 depth_map_gt,
@@ -267,6 +362,7 @@ class CustomDepthDataset(Dataset):
             ret_metrics = eval_metrics(gt_depth_maps, results)
         else:
             ret_metrics = pre_eval_to_metrics(results)
+            self._summarize_pre_eval_diagnostics(logger=logger)
 
         ret_metric_names = []
         ret_metric_values = []

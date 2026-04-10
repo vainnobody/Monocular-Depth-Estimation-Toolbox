@@ -4,8 +4,8 @@ data_root = 'data/vaihingen'
 train_split = 'splits/vaihingen/train.txt'
 val_split = 'splits/vaihingen/val.txt'
 test_split = 'splits/vaihingen/test.txt'
-manual_min_depth = 250.0
-manual_max_depth = 300.0
+manual_min_depth = 1e-3
+manual_max_depth = 500.0
 
 img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53],

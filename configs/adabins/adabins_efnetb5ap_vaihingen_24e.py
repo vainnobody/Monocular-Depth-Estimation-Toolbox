@@ -6,10 +6,10 @@ _base_ = [
 ]
 
 norm_cfg = dict(type="BN", requires_grad=True)
-manual_min_depth = 250.0
-manual_max_depth = 300.0
-manual_eval_min_depth = 250.0
-manual_eval_max_depth = 300.0
+manual_min_depth = 1e-3
+manual_max_depth = 500.0
+manual_eval_min_depth = 1e-3
+manual_eval_max_depth = 500.0
 
 model = dict(
     backbone=dict(
