@@ -45,6 +45,10 @@ def prepare_rgb(value):
 
 def prepare_depth(value, cmap='magma_r', vmin=None, vmax=None):
     value = to_numpy(value).astype(np.float32)
+    if value.ndim == 4:
+        # Visualization expects a single sample. When a batch is passed in,
+        # keep the first item to avoid shape-dependent hook failures.
+        value = value[0]
     if value.ndim == 2:
         value = value[None, ...]
     elif value.ndim == 3 and value.shape[0] not in (1, 3, 4) and value.shape[-1] == 1:
