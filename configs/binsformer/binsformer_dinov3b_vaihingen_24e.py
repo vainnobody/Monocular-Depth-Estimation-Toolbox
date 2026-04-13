@@ -116,30 +116,35 @@ data = dict(
 
 find_unused_parameters = True
 
-max_lr = 5e-5
+# Keep the Vaihingen normalization protocol above, but align the optimizer
+# and runner with the official BinsFormer toolbox recipe as closely as
+# possible for this custom DINOv3 backbone variant.
+max_lr = 1e-4
 optimizer = dict(
     type='AdamW',
     lr=max_lr,
-    weight_decay=0.1,
+    betas=(0.9, 0.999),
+    weight_decay=0.01,
     paramwise_cfg=dict(
         custom_keys={
-            'backbone': dict(lr_mult=1.0),
-            'neck': dict(lr_mult=10.0),
-            'decode_head': dict(lr_mult=10.0),
+            'norm': dict(decay_mult=0.),
         }))
 
 lr_config = dict(
     policy='OneCycle',
     max_lr=max_lr,
+    warmup_iters=1600 * 8,
     div_factor=25,
     final_div_factor=100,
     by_epoch=False)
 
-momentum_config = dict(policy='OneCycle')
-optimizer_config = dict(grad_clip=dict(max_norm=0.1, norm_type=2))
+optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
+runner = dict(type='IterBasedRunner', max_iters=1600 * 24)
+checkpoint_config = dict(by_epoch=False, max_keep_ckpts=2, interval=1600)
 evaluation = dict(
-    by_epoch=True,
-    interval=1,
+    by_epoch=False,
+    start=0,
+    interval=1600,
     pre_eval=True,
     save_viz=True,
     viz_dir='viz',
@@ -151,10 +156,10 @@ evaluation = dict(
 log_config = dict(
     interval=50,
     hooks=[
-        dict(type='TextLoggerHook', by_epoch=True),
+        dict(type='TextLoggerHook', by_epoch=False),
         dict(
             type='LocalVisualizationHook',
-            by_epoch=True,
+            by_epoch=False,
             out_dir='viz',
             interval=50,
             ignore_last=False),
