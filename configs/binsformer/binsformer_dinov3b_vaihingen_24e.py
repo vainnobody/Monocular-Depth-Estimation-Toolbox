@@ -6,10 +6,14 @@ _base_ = [
 ]
 
 norm_cfg = dict(type='BN', requires_grad=True)
-manual_min_depth = 1e-3
-manual_max_depth = 500.0
-manual_eval_min_depth = 1e-3
-manual_eval_max_depth = 500.0
+# RingMoE/HeightFormer-style Vaihingen protocol:
+# normalize raw DSM heights from dataset range into [1e-3, 1.0] before
+# training / validation, then evaluate Rel and delta metrics in normalized
+# space to avoid absolute terrain offsets inflating a1/a2/a3.
+raw_min_depth = 240.70
+raw_max_depth = 360.00
+norm_min_depth = 1e-3
+norm_max_depth = 1.0
 
 model = dict(
     backbone=dict(
@@ -31,8 +35,8 @@ model = dict(
         classify=False,
         in_channels=[96, 192, 384, 768],
         conv_dim=256,
-        min_depth=manual_min_depth,
-        max_depth=manual_max_depth,
+        min_depth=norm_min_depth,
+        max_depth=norm_max_depth,
         n_bins=64,
         index=[0, 1, 2, 3],
         trans_index=[1, 2, 3],
@@ -80,20 +84,35 @@ model = dict(
 data = dict(
     train=dict(
         dataset=dict(
-            min_depth=manual_min_depth,
-            max_depth=manual_max_depth,
-            eval_min_depth=manual_eval_min_depth,
-            eval_max_depth=manual_eval_max_depth)),
+            min_depth=norm_min_depth,
+            max_depth=norm_max_depth,
+            eval_min_depth=norm_min_depth,
+            eval_max_depth=norm_max_depth,
+            normalize_depth=True,
+            depth_normalize_min=raw_min_depth,
+            depth_normalize_max=raw_max_depth,
+            depth_norm_min=norm_min_depth,
+            depth_norm_max=norm_max_depth)),
     val=dict(
-        min_depth=manual_min_depth,
-        max_depth=manual_max_depth,
-        eval_min_depth=manual_eval_min_depth,
-        eval_max_depth=manual_eval_max_depth),
+        min_depth=norm_min_depth,
+        max_depth=norm_max_depth,
+        eval_min_depth=norm_min_depth,
+        eval_max_depth=norm_max_depth,
+        normalize_depth=True,
+        depth_normalize_min=raw_min_depth,
+        depth_normalize_max=raw_max_depth,
+        depth_norm_min=norm_min_depth,
+        depth_norm_max=norm_max_depth),
     test=dict(
-        min_depth=manual_min_depth,
-        max_depth=manual_max_depth,
-        eval_min_depth=manual_eval_min_depth,
-        eval_max_depth=manual_eval_max_depth))
+        min_depth=norm_min_depth,
+        max_depth=norm_max_depth,
+        eval_min_depth=norm_min_depth,
+        eval_max_depth=norm_max_depth,
+        normalize_depth=True,
+        depth_normalize_min=raw_min_depth,
+        depth_normalize_max=raw_max_depth,
+        depth_norm_min=norm_min_depth,
+        depth_norm_max=norm_max_depth))
 
 find_unused_parameters = True
 
