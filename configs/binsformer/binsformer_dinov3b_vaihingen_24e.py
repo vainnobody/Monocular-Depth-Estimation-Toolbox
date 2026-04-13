@@ -139,9 +139,10 @@ lr_config = dict(
     by_epoch=False)
 
 optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
-runner = dict(type='IterBasedRunner', max_iters=1600 * 24)
-checkpoint_config = dict(by_epoch=False, max_keep_ckpts=2, interval=1600)
+runner = dict(_delete_=True, type='IterBasedRunner', max_iters=1600 * 24)
+checkpoint_config = dict(_delete_=True, by_epoch=False, max_keep_ckpts=2, interval=1600)
 evaluation = dict(
+    _delete_=True,
     by_epoch=False,
     start=0,
     interval=1600,
