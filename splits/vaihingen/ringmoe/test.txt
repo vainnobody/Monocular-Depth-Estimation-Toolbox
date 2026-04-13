@@ -1,0 +1,18 @@
+# RingMoE / HeightFormer-style official Vaihingen test split (17 tiles).
+image/top_mosaic_09cm_area2.tif dsm/top_mosaic_09cm_area2.tif
+image/top_mosaic_09cm_area4.tif dsm/top_mosaic_09cm_area4.tif
+image/top_mosaic_09cm_area6.tif dsm/top_mosaic_09cm_area6.tif
+image/top_mosaic_09cm_area8.tif dsm/top_mosaic_09cm_area8.tif
+image/top_mosaic_09cm_area10.tif dsm/top_mosaic_09cm_area10.tif
+image/top_mosaic_09cm_area12.tif dsm/top_mosaic_09cm_area12.tif
+image/top_mosaic_09cm_area14.tif dsm/top_mosaic_09cm_area14.tif
+image/top_mosaic_09cm_area16.tif dsm/top_mosaic_09cm_area16.tif
+image/top_mosaic_09cm_area20.tif dsm/top_mosaic_09cm_area20.tif
+image/top_mosaic_09cm_area22.tif dsm/top_mosaic_09cm_area22.tif
+image/top_mosaic_09cm_area24.tif dsm/top_mosaic_09cm_area24.tif
+image/top_mosaic_09cm_area27.tif dsm/top_mosaic_09cm_area27.tif
+image/top_mosaic_09cm_area29.tif dsm/top_mosaic_09cm_area29.tif
+image/top_mosaic_09cm_area31.tif dsm/top_mosaic_09cm_area31.tif
+image/top_mosaic_09cm_area33.tif dsm/top_mosaic_09cm_area33.tif
+image/top_mosaic_09cm_area35.tif dsm/top_mosaic_09cm_area35.tif
+image/top_mosaic_09cm_area38.tif dsm/top_mosaic_09cm_area38.tif

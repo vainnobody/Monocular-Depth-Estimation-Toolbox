@@ -1,0 +1,20 @@
+# RingMoE / HeightFormer-style official Vaihingen train split (16 tiles).
+# This file assumes a flat layout under data/vaihingen/image and data/vaihingen/dsm.
+# If your data uses a nested layout such as data/vaihingen/train/image, regenerate
+# this split with tools/misc/generate_vaihingen_splits.py.
+image/top_mosaic_09cm_area1.tif dsm/top_mosaic_09cm_area1.tif
+image/top_mosaic_09cm_area3.tif dsm/top_mosaic_09cm_area3.tif
+image/top_mosaic_09cm_area5.tif dsm/top_mosaic_09cm_area5.tif
+image/top_mosaic_09cm_area7.tif dsm/top_mosaic_09cm_area7.tif
+image/top_mosaic_09cm_area11.tif dsm/top_mosaic_09cm_area11.tif
+image/top_mosaic_09cm_area13.tif dsm/top_mosaic_09cm_area13.tif
+image/top_mosaic_09cm_area15.tif dsm/top_mosaic_09cm_area15.tif
+image/top_mosaic_09cm_area17.tif dsm/top_mosaic_09cm_area17.tif
+image/top_mosaic_09cm_area21.tif dsm/top_mosaic_09cm_area21.tif
+image/top_mosaic_09cm_area23.tif dsm/top_mosaic_09cm_area23.tif
+image/top_mosaic_09cm_area26.tif dsm/top_mosaic_09cm_area26.tif
+image/top_mosaic_09cm_area28.tif dsm/top_mosaic_09cm_area28.tif
+image/top_mosaic_09cm_area30.tif dsm/top_mosaic_09cm_area30.tif
+image/top_mosaic_09cm_area32.tif dsm/top_mosaic_09cm_area32.tif
+image/top_mosaic_09cm_area34.tif dsm/top_mosaic_09cm_area34.tif
+image/top_mosaic_09cm_area37.tif dsm/top_mosaic_09cm_area37.tif

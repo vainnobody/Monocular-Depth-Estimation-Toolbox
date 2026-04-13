@@ -37,8 +37,8 @@ def parse_args():
                         help='Path to train split file. Can be absolute.')
     parser.add_argument('--val-split', default=None,
                         help='Optional path to val split file. Can be absolute.')
-    parser.add_argument('--default-min-depth', type=float, default=250.0)
-    parser.add_argument('--default-max-depth', type=float, default=300.0)
+    parser.add_argument('--default-min-depth', type=float, default=240.70)
+    parser.add_argument('--default-max-depth', type=float, default=360.00)
     parser.add_argument('--quiet', action='store_true')
     parser.add_argument('--strict-overlap', action='store_true')
     return parser.parse_args()
