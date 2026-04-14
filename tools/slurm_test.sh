@@ -5,12 +5,26 @@ set -x
 PARTITION=$1
 JOB_NAME=$2
 CONFIG=$3
-CHECKPOINT=$4
 GPUS=${GPUS:-4}
 GPUS_PER_NODE=${GPUS_PER_NODE:-4}
 CPUS_PER_TASK=${CPUS_PER_TASK:-5}
-PY_ARGS=${@:5}
 SRUN_ARGS=${SRUN_ARGS:-""}
+
+if [[ "$4" =~ ^[0-9]+$ ]]; then
+    CHECKPOINT=""
+    GPUS=$4
+    GPUS_PER_NODE=${GPUS_PER_NODE:-$GPUS}
+    PY_ARGS=${@:5}
+else
+    CHECKPOINT=$4
+    PY_ARGS=${@:5}
+fi
+
+TEST_ARGS=("${CONFIG}")
+
+if [[ -n "$CHECKPOINT" ]]; then
+    TEST_ARGS+=("${CHECKPOINT}")
+fi
 
 PYTHONPATH="$(dirname $0)/..":$PYTHONPATH \
 srun -p ${PARTITION} \
@@ -21,4 +35,4 @@ srun -p ${PARTITION} \
     --cpus-per-task=${CPUS_PER_TASK} \
     --kill-on-bad-exit=1 \
     ${SRUN_ARGS} \
-    python -u tools/test.py ${CONFIG} ${CHECKPOINT} --launcher="slurm" ${PY_ARGS}
+    python -u tools/test.py "${TEST_ARGS[@]}" --launcher="slurm" ${PY_ARGS}
