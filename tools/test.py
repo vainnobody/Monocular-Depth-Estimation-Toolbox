@@ -27,7 +27,8 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description='depth test (and eval) a model')
     parser.add_argument('config', help='test config file path')
-    parser.add_argument('checkpoint', help='checkpoint file')
+    parser.add_argument(
+        'checkpoint', nargs='?', default=None, help='checkpoint file')
     parser.add_argument(
         '--aug-test', action='store_true', help='Use Flip and Multi scale aug')
     parser.add_argument('--out', help='output result file in pickle format')
@@ -135,8 +136,17 @@ def main():
     if fp16_cfg is not None:
         wrap_fp16_model(model)
     
-    # for other models
-    checkpoint = load_checkpoint(model, args.checkpoint, map_location='cpu')
+    checkpoint_path = args.checkpoint or cfg.get('load_from')
+    if checkpoint_path is None:
+        raise ValueError(
+            'checkpoint is required. Pass it explicitly or set cfg.load_from '
+            'in the config file.')
+    if not osp.isfile(checkpoint_path):
+        raise FileNotFoundError(
+            f'checkpoint not found: {checkpoint_path}')
+
+    print(f'Loading checkpoint from: {checkpoint_path}')
+    checkpoint = load_checkpoint(model, checkpoint_path, map_location='cpu')
 
     # clean gpu memory when starting a new evaluation.
     torch.cuda.empty_cache()
