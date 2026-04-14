@@ -127,6 +127,30 @@ class DepthEncoderDecoder(BaseDepther):
 
         return depth_pred
 
+    def _build_slide_blend_weight(self, crop_h, crop_w, device, dtype):
+        """Create a smooth weighting mask for overlap-add slide inference.
+
+        Equal averaging keeps seams when crop-border predictions are less
+        stable. A Hann-style center-weighted mask suppresses those borders
+        while still covering the full crop.
+        """
+        if crop_h <= 1:
+            weight_h = torch.ones((crop_h,), device=device, dtype=dtype)
+        else:
+            weight_h = torch.hann_window(
+                crop_h, periodic=False, device=device, dtype=dtype)
+        if crop_w <= 1:
+            weight_w = torch.ones((crop_w,), device=device, dtype=dtype)
+        else:
+            weight_w = torch.hann_window(
+                crop_w, periodic=False, device=device, dtype=dtype)
+
+        weight = weight_h[:, None] * weight_w[None, :]
+        # Avoid zeros on crop borders so image boundaries that are only covered
+        # once remain numerically stable.
+        weight = weight.clamp_min(1e-3)
+        return weight[None, None, :, :]
+
     def slide_inference(self, img, img_meta, rescale):
         """Inference by sliding-window with overlap."""
         h_stride, w_stride = self.test_cfg.stride
@@ -157,16 +181,28 @@ class DepthEncoderDecoder(BaseDepther):
 
                 crop_depth_pred = self.encode_decode(
                     crop_img, crop_img_metas, rescale=True)
+                crop_weight = self._build_slide_blend_weight(
+                    crop_depth_pred.shape[2],
+                    crop_depth_pred.shape[3],
+                    device=crop_depth_pred.device,
+                    dtype=crop_depth_pred.dtype)
 
                 preds += F.pad(
-                    crop_depth_pred,
+                    crop_depth_pred * crop_weight,
                     (
                         int(x1),
                         int(preds.shape[3] - x2),
                         int(y1),
                         int(preds.shape[2] - y2),
                     ))
-                count_mat[:, :, y1:y2, x1:x2] += 1
+                count_mat += F.pad(
+                    crop_weight.expand(batch_size, -1, -1, -1),
+                    (
+                        int(x1),
+                        int(preds.shape[3] - x2),
+                        int(y1),
+                        int(preds.shape[2] - y2),
+                    ))
 
         assert (count_mat == 0).sum() == 0
         depth_pred = preds / count_mat

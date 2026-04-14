@@ -6,6 +6,10 @@ _base_ = [
 ]
 
 norm_cfg = dict(type='BN', requires_grad=True)
+img_norm_cfg = dict(
+    mean=[123.675, 116.28, 103.53],
+    std=[58.395, 57.12, 57.375],
+    to_rgb=True)
 # RingMoE/HeightFormer-style Vaihingen protocol:
 # normalize raw DSM heights from dataset range into [1e-3, 1.0] before
 # training / validation, then evaluate Rel and delta metrics in normalized
@@ -14,6 +18,26 @@ raw_min_depth = 240.70
 raw_max_depth = 360.00
 norm_min_depth = 1e-3
 norm_max_depth = 1.0
+
+test_pipeline = [
+    dict(type='LoadImageFromFile'),
+    dict(
+        type='MultiScaleFlipAug',
+        img_scale=(512, 512),
+        flip=True,
+        flip_direction='horizontal',
+        transforms=[
+            dict(type='RandomFlip', direction='horizontal'),
+            dict(type='Normalize', **img_norm_cfg),
+            dict(type='ImageToTensor', keys=['img']),
+            dict(
+                type='Collect',
+                keys=['img'],
+                meta_keys=('filename', 'ori_filename', 'ori_shape',
+                           'img_shape', 'pad_shape', 'scale_factor', 'flip',
+                           'flip_direction', 'img_norm_cfg')),
+        ])
+]
 
 model = dict(
     backbone=dict(
@@ -79,7 +103,7 @@ model = dict(
                     ffn_drop=0.0),
                 operation_order=('cross_attn', 'norm', 'self_attn', 'norm',
                                  'ffn', 'norm')))),
-    test_cfg=dict(mode='slide', crop_size=(512, 512), stride=(384, 384)))
+    test_cfg=dict(mode='slide', crop_size=(512, 512), stride=(256, 256)))
 
 data = dict(
     train=dict(
@@ -98,6 +122,7 @@ data = dict(
         max_depth=norm_max_depth,
         eval_min_depth=norm_min_depth,
         eval_max_depth=norm_max_depth,
+        pipeline=test_pipeline,
         normalize_depth=True,
         depth_normalize_min=raw_min_depth,
         depth_normalize_max=raw_max_depth,
@@ -108,6 +133,7 @@ data = dict(
         max_depth=norm_max_depth,
         eval_min_depth=norm_min_depth,
         eval_max_depth=norm_max_depth,
+        pipeline=test_pipeline,
         normalize_depth=True,
         depth_normalize_min=raw_min_depth,
         depth_normalize_max=raw_max_depth,
