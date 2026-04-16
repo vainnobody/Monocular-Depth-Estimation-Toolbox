@@ -4,3 +4,4 @@ from .depthformer_swin import DepthFormerSwin
 from .swin import SwinTransformer
 from .vit import VisionTransformer
 from .dinov3 import DINOv3Backbone
+from .dinov3_sparse import DINOv3SparseMoEBackbone
