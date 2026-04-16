@@ -1,18 +1,12 @@
-import os
-
 _base_ = ['./binsformer_dinov3b_vaihingen_24e.py']
 
-# Set SPARSE_PRETRAINED=/abs/path/to/your_sparse_encoder.pth before launching,
-# or override with:
+# Replace this with your sparse/MoE encoder checkpoint, or override with:
 #   --options model.backbone.pretrained=/abs/path/to/your_sparse_encoder.pth
 #
-# The root-level train.py hard-codes a detector checkpoint path and maps
-# `encoder.* -> backbone.*`. The sparse backbone loader used here implements
-# the same prefix handling for depth training and ignores unrelated decoder
-# keys in that checkpoint.
-sparse_pretrained = os.environ.get(
-    'SPARSE_PRETRAINED',
-    'pretrained/your_sparse_encoder.pth')
+# The sparse backbone loader supports checkpoints whose backbone weights are
+# stored under `encoder.*`, `module.encoder.*`, `backbone.*`, or
+# `module.backbone.*`, and ignores unrelated decoder keys.
+sparse_pretrained = 'pretrained/your_sparse_encoder.pth'
 
 model = dict(
     backbone=dict(
