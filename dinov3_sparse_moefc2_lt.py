@@ -1653,14 +1653,31 @@ class DinoVisionTransformerSparseMoEFC2_LT(nn.Module):
 
         ckpt = torch.load(pretrained, map_location="cpu")
         state_dict = _unwrap_sparse_checkpoint_state_dict(ckpt)
-        msg = self.load_state_dict(state_dict, strict=False)
+        model_state = self.state_dict()
+        filtered_state_dict = {}
+        skipped_nomatch = []
+        skipped_shape = []
+        for key, value in state_dict.items():
+            if key not in model_state:
+                skipped_nomatch.append(key)
+                continue
+            if model_state[key].shape != value.shape:
+                skipped_shape.append((key, tuple(value.shape), tuple(model_state[key].shape)))
+                continue
+            filtered_state_dict[key] = value
+
+        msg = self.load_state_dict(filtered_state_dict, strict=False)
         logger.info(
-            "[init_weights] Loaded sparse backbone from %s (loaded=%d, missing=%d, unexpected=%d)",
+            "[init_weights] Loaded sparse backbone from %s (loaded=%d, skipped_nomatch=%d, skipped_shape=%d, missing=%d, unexpected=%d)",
             pretrained,
-            len(state_dict),
+            len(filtered_state_dict),
+            len(skipped_nomatch),
+            len(skipped_shape),
             len(msg.missing_keys),
             len(msg.unexpected_keys),
         )
+        if skipped_shape:
+            logger.info("[init_weights] example shape mismatches: %s", skipped_shape[:8])
 
     def gather_moe_aux_loss(self):
         """返回所有 MoE fc2 层 aux-loss 的平均；若没有则返回 0。"""
