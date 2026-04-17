@@ -33,6 +33,12 @@ test_split_override = os.getenv('VAIHINGEN_TEST_SPLIT')
 samples_per_gpu = int(os.getenv('VAIHINGEN_SAMPLES_PER_GPU', '8'))
 workers_per_gpu = int(os.getenv('VAIHINGEN_WORKERS_PER_GPU', '2'))
 
+# Default to the local Vaihingen split files unless the server overrides them
+# with absolute paths via environment variables.
+default_train_split = 'splits/vaihingen/train.txt'
+default_val_split = 'splits/vaihingen/val.txt'
+default_test_split = 'splits/vaihingen/test.txt'
+
 train_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(type='DepthLoadAnnotations'),
@@ -138,6 +144,7 @@ data = dict(
     workers_per_gpu=workers_per_gpu,
     train=dict(
         dataset=dict(
+            split=default_train_split,
             pipeline=train_pipeline,
             min_depth=norm_min_depth,
             max_depth=norm_max_depth,
@@ -149,6 +156,7 @@ data = dict(
             depth_norm_min=norm_min_depth,
             depth_norm_max=norm_max_depth)),
     val=dict(
+        split=default_val_split,
         pipeline=test_pipeline,
         min_depth=norm_min_depth,
         max_depth=norm_max_depth,
@@ -160,6 +168,7 @@ data = dict(
         depth_norm_min=norm_min_depth,
         depth_norm_max=norm_max_depth),
     test=dict(
+        split=default_test_split,
         pipeline=test_pipeline,
         min_depth=norm_min_depth,
         max_depth=norm_max_depth,
