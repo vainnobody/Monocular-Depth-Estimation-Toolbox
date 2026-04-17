@@ -292,25 +292,37 @@ class CustomDepthDataset(Dataset):
                 gt_p1=np.nan,
                 gt_p99=np.nan,
                 gt_max=np.nan,
+                gt_near_min_ratio=np.nan,
+                gt_near_max_ratio=np.nan,
                 pred_min=np.nan,
                 pred_p1=np.nan,
                 pred_p99=np.nan,
-                pred_max=np.nan)
+                pred_max=np.nan,
+                pred_near_min_ratio=np.nan,
+                pred_near_max_ratio=np.nan)
             return diagnostic
 
         gt_valid = depth_map_gt[valid_mask]
         pred_valid = pred[valid_mask]
         gt_percentiles = np.percentile(gt_valid, [1.0, 99.0])
         pred_percentiles = np.percentile(pred_valid, [1.0, 99.0])
+        depth_span = max(float(self.eval_max_depth - self.eval_min_depth), 1e-12)
+        boundary_margin = max(depth_span * 0.02, 1e-6)
+        lower_band = self.eval_min_depth + boundary_margin
+        upper_band = self.eval_max_depth - boundary_margin
         diagnostic.update(
             gt_min=float(gt_valid.min()),
             gt_p1=float(gt_percentiles[0]),
             gt_p99=float(gt_percentiles[1]),
             gt_max=float(gt_valid.max()),
+            gt_near_min_ratio=float((gt_valid <= lower_band).mean()),
+            gt_near_max_ratio=float((gt_valid >= upper_band).mean()),
             pred_min=float(pred_valid.min()),
             pred_p1=float(pred_percentiles[0]),
             pred_p99=float(pred_percentiles[1]),
-            pred_max=float(pred_valid.max()))
+            pred_max=float(pred_valid.max()),
+            pred_near_min_ratio=float((pred_valid <= lower_band).mean()),
+            pred_near_max_ratio=float((pred_valid >= upper_band).mean()))
         return diagnostic
 
     def _summarize_pre_eval_diagnostics(self, logger=None):
@@ -336,10 +348,14 @@ class CustomDepthDataset(Dataset):
             'gt_p1_mean',
             'gt_p99_mean',
             'gt_max_mean',
+            'gt_near_min_ratio_mean',
+            'gt_near_max_ratio_mean',
             'pred_min_mean',
             'pred_p1_mean',
             'pred_p99_mean',
             'pred_max_mean',
+            'pred_near_min_ratio_mean',
+            'pred_near_max_ratio_mean',
         ])
         summary_table_data.add_column('value', [
             np.round(float(np.nanmean(valid_ratios)), 6),
@@ -350,10 +366,14 @@ class CustomDepthDataset(Dataset):
             np.round(_summary('gt_p1'), 4),
             np.round(_summary('gt_p99'), 4),
             np.round(_summary('gt_max'), 4),
+            np.round(_summary('gt_near_min_ratio'), 4),
+            np.round(_summary('gt_near_max_ratio'), 4),
             np.round(_summary('pred_min'), 4),
             np.round(_summary('pred_p1'), 4),
             np.round(_summary('pred_p99'), 4),
             np.round(_summary('pred_max'), 4),
+            np.round(_summary('pred_near_min_ratio'), 4),
+            np.round(_summary('pred_near_max_ratio'), 4),
         ])
 
         print_log('Pre-eval diagnostics:', logger)

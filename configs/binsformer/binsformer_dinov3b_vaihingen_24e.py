@@ -1,6 +1,8 @@
+import os
+
 _base_ = [
     '../_base_/models/binsformer.py',
-    '../_base_/datasets/vaihingen.py',
+    '../_base_/datasets/vaihingen_ringmoe.py',
     '../_base_/default_runtime.py',
     '../_base_/schedules/schedule_24x.py',
 ]
@@ -10,24 +12,50 @@ img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53],
     std=[58.395, 57.12, 57.375],
     to_rgb=True)
-# RingMoE/HeightFormer-style Vaihingen protocol:
-# normalize raw DSM heights from dataset range into [1e-3, 1.0] before
-# training / validation, then evaluate Rel and delta metrics in normalized
-# space to avoid absolute terrain offsets inflating a1/a2/a3.
+
+# RingMoE / HeightFormer-style Vaihingen protocol:
+# normalize raw DSM heights into [1e-3, 1.0] for both training and eval,
+# and keep evaluation in the normalized domain for Rel / delta metrics.
 raw_min_depth = 240.70
 raw_max_depth = 360.00
 norm_min_depth = 1e-3
 norm_max_depth = 1.0
+crop_size = (512, 512)
+
+total_iters = 1600 * 24
+warmup_iters = int(total_iters * 0.3)
+
+# Server training often overrides these via absolute split files.
+data_root_override = os.getenv('VAIHINGEN_DATA_ROOT')
+train_split_override = os.getenv('VAIHINGEN_TRAIN_SPLIT')
+val_split_override = os.getenv('VAIHINGEN_VAL_SPLIT')
+test_split_override = os.getenv('VAIHINGEN_TEST_SPLIT')
+samples_per_gpu = int(os.getenv('VAIHINGEN_SAMPLES_PER_GPU', '8'))
+workers_per_gpu = int(os.getenv('VAIHINGEN_WORKERS_PER_GPU', '2'))
+
+train_pipeline = [
+    dict(type='LoadImageFromFile'),
+    dict(type='DepthLoadAnnotations'),
+    dict(type='RandomRotate', prob=0.5, degree=2.5),
+    dict(type='RandomFlip', prob=0.5),
+    dict(type='RandomCrop', crop_size=crop_size),
+    dict(type='Normalize', **img_norm_cfg),
+    dict(type='DefaultFormatBundle'),
+    dict(
+        type='Collect',
+        keys=['img', 'depth_gt'],
+        meta_keys=('filename', 'ori_filename', 'ori_shape', 'img_shape',
+                   'pad_shape', 'scale_factor', 'flip', 'flip_direction',
+                   'img_norm_cfg')),
+]
 
 test_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(
         type='MultiScaleFlipAug',
         img_scale=(512, 512),
-        flip=True,
-        flip_direction='horizontal',
+        flip=False,
         transforms=[
-            dict(type='RandomFlip', direction='horizontal'),
             dict(type='Normalize', **img_norm_cfg),
             dict(type='ImageToTensor', keys=['img']),
             dict(
@@ -103,11 +131,14 @@ model = dict(
                     ffn_drop=0.0),
                 operation_order=('cross_attn', 'norm', 'self_attn', 'norm',
                                  'ffn', 'norm')))),
-    test_cfg=dict(mode='slide', crop_size=(512, 512), stride=(256, 256)))
+    test_cfg=dict(mode='slide', crop_size=(512, 512), stride=(384, 384)))
 
 data = dict(
+    samples_per_gpu=samples_per_gpu,
+    workers_per_gpu=workers_per_gpu,
     train=dict(
         dataset=dict(
+            pipeline=train_pipeline,
             min_depth=norm_min_depth,
             max_depth=norm_max_depth,
             eval_min_depth=norm_min_depth,
@@ -118,33 +149,43 @@ data = dict(
             depth_norm_min=norm_min_depth,
             depth_norm_max=norm_max_depth)),
     val=dict(
+        pipeline=test_pipeline,
         min_depth=norm_min_depth,
         max_depth=norm_max_depth,
         eval_min_depth=norm_min_depth,
         eval_max_depth=norm_max_depth,
-        pipeline=test_pipeline,
         normalize_depth=True,
         depth_normalize_min=raw_min_depth,
         depth_normalize_max=raw_max_depth,
         depth_norm_min=norm_min_depth,
         depth_norm_max=norm_max_depth),
     test=dict(
+        pipeline=test_pipeline,
         min_depth=norm_min_depth,
         max_depth=norm_max_depth,
         eval_min_depth=norm_min_depth,
         eval_max_depth=norm_max_depth,
-        pipeline=test_pipeline,
         normalize_depth=True,
         depth_normalize_min=raw_min_depth,
         depth_normalize_max=raw_max_depth,
         depth_norm_min=norm_min_depth,
         depth_norm_max=norm_max_depth))
 
+if data_root_override:
+    data['train']['dataset']['data_root'] = data_root_override
+    data['val']['data_root'] = data_root_override
+    data['test']['data_root'] = data_root_override
+if train_split_override:
+    data['train']['dataset']['split'] = train_split_override
+if val_split_override:
+    data['val']['split'] = val_split_override
+if test_split_override:
+    data['test']['split'] = test_split_override
+
 find_unused_parameters = True
 
-# Keep the Vaihingen normalization protocol above, but align the optimizer
-# and runner with the official BinsFormer toolbox recipe as closely as
-# possible for this custom DINOv3 backbone variant.
+# Keep the official 38.4k-iter BinsFormer recipe, but make DINOv3 fine-tuning
+# more stable by using a smaller LR on the pretrained backbone.
 max_lr = 1e-4
 optimizer = dict(
     type='AdamW',
@@ -153,20 +194,25 @@ optimizer = dict(
     weight_decay=0.01,
     paramwise_cfg=dict(
         custom_keys={
+            'backbone': dict(lr_mult=0.1),
+            'neck': dict(lr_mult=1.0),
+            'decode_head': dict(lr_mult=1.0),
             'norm': dict(decay_mult=0.),
         }))
 
 lr_config = dict(
     policy='OneCycle',
     max_lr=max_lr,
-    warmup_iters=1600 * 8,
+    warmup_iters=warmup_iters,
     div_factor=25,
     final_div_factor=100,
     by_epoch=False)
 
-optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
-runner = dict(_delete_=True, type='IterBasedRunner', max_iters=1600 * 24)
-checkpoint_config = dict(_delete_=True, by_epoch=False, max_keep_ckpts=2, interval=1600)
+momentum_config = dict(policy='OneCycle')
+optimizer_config = dict(grad_clip=dict(max_norm=0.1, norm_type=2))
+runner = dict(_delete_=True, type='IterBasedRunner', max_iters=total_iters)
+checkpoint_config = dict(
+    _delete_=True, by_epoch=False, max_keep_ckpts=2, interval=1600)
 evaluation = dict(
     _delete_=True,
     by_epoch=False,
