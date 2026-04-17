@@ -182,6 +182,8 @@ if val_split_override:
 if test_split_override:
     data['test']['split'] = test_split_override
 
+del os
+
 find_unused_parameters = True
 
 # Keep the official 38.4k-iter BinsFormer recipe, but make DINOv3 fine-tuning
