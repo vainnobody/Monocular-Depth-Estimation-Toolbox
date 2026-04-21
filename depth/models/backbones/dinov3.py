@@ -12,6 +12,7 @@ from typing import Any, Callable, Dict, List, Literal, Optional, Sequence, Tuple
 import torch
 from mmcv.runner import BaseModule
 from torch import Tensor, nn
+from torch.utils import checkpoint as cp
 
 from depth.utils import get_root_logger
 from ..builder import BACKBONES
@@ -437,12 +438,14 @@ class DINOv3Backbone(BaseModule):
                  img_size=518,
                  out_indices=(2, 5, 8, 11),
                  output_cls_token=True,
+                 with_cp=False,
                  pretrained='pretrained/dinov3_base.pth',
                  init_cfg=None):
         super().__init__(init_cfg=init_cfg)
         self.model_name = model_name
         self.out_indices = out_indices
         self.output_cls_token = output_cls_token
+        self.with_cp = with_cp
         self.pretrained = pretrained
         self.backbone = build_dinov3_model(model_name=model_name, img_size=img_size)
         self.embed_dim = self.backbone.embed_dim
@@ -467,11 +470,43 @@ class DINOv3Backbone(BaseModule):
             len(load_result.missing_keys),
             len(load_result.unexpected_keys))
 
+    def _forward_block(self, blk, x, rope):
+        if self.with_cp and self.training and x.requires_grad:
+            sin, cos = rope
+            return cp.checkpoint(
+                lambda inp, sin_inp, cos_inp: blk(inp, (sin_inp, cos_inp)),
+                x,
+                sin,
+                cos)
+        return blk(x, rope)
+
     def forward(self, inputs):
-        outs = self.backbone.get_intermediate_layers(
-            inputs,
-            n=self.out_indices,
-            reshape=True,
-            return_class_token=self.output_cls_token,
-            norm=True)
+        x, (H, W) = self.backbone.prepare_tokens_with_masks(inputs)
+        output, blocks_to_take = [], set(self.out_indices)
+
+        for i, blk in enumerate(self.backbone.blocks):
+            rope_sincos = self.backbone.rope_embed(H=H, W=W)
+            x = self._forward_block(blk, x, rope_sincos)
+            if i in blocks_to_take:
+                output.append(x)
+
+        assert len(output) == len(self.out_indices), (
+            f'only {len(output)} / {len(self.out_indices)} blocks found')
+
+        output = [self.backbone.norm(out) for out in output]
+        class_tokens = [out[:, 0] for out in output]
+        output = [out[:, self.backbone.n_storage_tokens + 1:] for out in output]
+
+        B, _, h, w = inputs.shape
+        output = [
+            out.reshape(B, h // self.patch_size, w // self.patch_size, -1)
+            .permute(0, 3, 1, 2)
+            .contiguous()
+            for out in output
+        ]
+
+        if self.output_cls_token:
+            outs = tuple(zip(output, class_tokens))
+        else:
+            outs = tuple(output)
         return tuple(outs)
