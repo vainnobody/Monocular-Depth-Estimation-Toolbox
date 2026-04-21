@@ -5,6 +5,7 @@
 from typing import Callable, List
 
 import torch
+import torch.utils.checkpoint as cp
 from torch import Tensor, nn
 
 from .attention import SelfAttention
@@ -30,6 +31,7 @@ class SelfAttentionBlock(nn.Module):
         attn_class: Callable[..., nn.Module] = SelfAttention,
         ffn_layer: Callable[..., nn.Module] = Mlp,
         mask_k_bias: bool = False,
+        with_cp: bool = False,
         device=None,
     ) -> None:
         super().__init__()
@@ -67,6 +69,7 @@ class SelfAttentionBlock(nn.Module):
         )
 
         self.sample_drop_ratio = drop_path
+        self.with_cp = with_cp
 
     def _forward(self, x: Tensor, rope=None) -> Tensor:
         """Forward pass for a single tensor."""
@@ -104,12 +107,18 @@ class SelfAttentionBlock(nn.Module):
 
     def forward(self, x_or_x_list, rope_or_rope_list=None) -> Tensor:
         if isinstance(x_or_x_list, Tensor):
+            if self.with_cp and x_or_x_list.requires_grad:
+                return cp.checkpoint(
+                    lambda x: self._forward(x, rope=rope_or_rope_list),
+                    x_or_x_list,
+                )
             return self._forward(x_or_x_list, rope=rope_or_rope_list)
         elif isinstance(x_or_x_list, list):
             if rope_or_rope_list is None:
                 rope_or_rope_list = [None for _ in x_or_x_list]
             return [
-                self._forward(x, rope=rope)
+                cp.checkpoint(lambda x_: self._forward(x_, rope=rope), x)
+                if self.with_cp and x.requires_grad else self._forward(x, rope=rope)
                 for x, rope in zip(x_or_x_list, rope_or_rope_list)
             ]
         else:

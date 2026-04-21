@@ -144,6 +144,7 @@ class DinoVisionTransformer(BaseModule):
         proj_bias: bool = True,
         n_storage_tokens: int = 0,
         mask_k_bias: bool = False,
+        with_cp: bool = False,
         device: Any = None,
         init_cfg=None,
         **ignored_kwargs,
@@ -158,6 +159,7 @@ class DinoVisionTransformer(BaseModule):
         self.n_blocks = depth
         self.num_heads = num_heads
         self.patch_size = patch_size
+        self.with_cp = with_cp
 
         self.patch_embed = PatchEmbed(
             img_size=img_size,
@@ -202,6 +204,7 @@ class DinoVisionTransformer(BaseModule):
                 ffn_layer=ffn_layer_cls,
                 init_values=layerscale_init,
                 mask_k_bias=mask_k_bias,
+                with_cp=with_cp,
                 device=device,
             )
             for i in range(depth)
@@ -435,14 +438,19 @@ class DINOv3Backbone(BaseModule):
                  img_size=518,
                  out_indices=(2, 5, 8, 11),
                  output_cls_token=True,
+                 with_cp=False,
                  pretrained='pretrained/dinov3_base.pth',
                  init_cfg=None):
         super().__init__(init_cfg=init_cfg)
         self.model_name = model_name
         self.out_indices = out_indices
         self.output_cls_token = output_cls_token
+        self.with_cp = with_cp
         self.pretrained = pretrained
-        self.backbone = build_dinov3_model(model_name=model_name, img_size=img_size)
+        self.backbone = build_dinov3_model(
+            model_name=model_name,
+            img_size=img_size,
+            with_cp=with_cp)
         self.embed_dim = self.backbone.embed_dim
         self.patch_size = self.backbone.patch_size
 
