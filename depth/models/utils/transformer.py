@@ -1142,8 +1142,9 @@ class PureMSDEnTransformer(BaseModule):
         """Initialize layers of the DeformableDetrTransformer."""
         self.level_embeds = nn.Parameter(
             torch.Tensor(self.num_feature_levels, self.embed_dims))
-
-        self.reference_points = nn.Linear(self.embed_dims, 2)
+        # Encoder reference points are generated analytically in forward(), so
+        # this learnable projection is never consumed.
+        self.reference_points = None
 
     def init_weights(self):
         """Initialize the transformer weights."""
@@ -1157,7 +1158,6 @@ class PureMSDEnTransformer(BaseModule):
         for m in self.modules():
             if isinstance(m, MultiScaleDeformableAttention):
                 m.init_weights()
-        xavier_init(self.reference_points, distribution='uniform', bias=0.)
         normal_(self.level_embeds)
 
     @staticmethod

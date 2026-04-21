@@ -76,6 +76,9 @@ class BinsFormerDecodeHead(DepthBaseDecodeHead):
                  train_cfg=dict(aux_loss=True,),
                  **kwargs):
         super(BinsFormerDecodeHead, self).__init__(**kwargs)
+        # DepthBaseDecodeHead always registers conv_depth, but BinsFormer uses
+        # transformer prediction heads instead, so conv_depth is dead weight.
+        self.conv_depth = None
 
         self.conv_dim = conv_dim
         self.act_cfg = act_cfg
