@@ -6,7 +6,6 @@
 
 import logging
 import os.path as osp
-import inspect
 from functools import partial
 from typing import Any, Callable, Dict, List, Literal, Optional, Sequence, Tuple, Union
 
@@ -471,24 +470,14 @@ class DINOv3Backbone(BaseModule):
             len(load_result.missing_keys),
             len(load_result.unexpected_keys))
 
-    def _forward_block(self, blk, block_idx, x, rope):
-        # Do not checkpoint blocks whose outputs are tapped as multi-scale features:
-        # reentrant backward on branched outputs can trip DDP's "mark ready twice".
-        use_cp = (
-            self.with_cp and self.training and x.requires_grad
-            and block_idx not in self.out_indices
-        )
-        if use_cp:
+    def _forward_block(self, blk, x, rope):
+        if self.with_cp and self.training and x.requires_grad:
             sin, cos = rope
-            checkpoint_kwargs = {}
-            if 'use_reentrant' in inspect.signature(cp.checkpoint).parameters:
-                checkpoint_kwargs['use_reentrant'] = False
             return cp.checkpoint(
                 lambda inp, sin_inp, cos_inp: blk(inp, (sin_inp, cos_inp)),
                 x,
                 sin,
-                cos,
-                **checkpoint_kwargs)
+                cos)
         return blk(x, rope)
 
     def forward(self, inputs):
@@ -497,7 +486,7 @@ class DINOv3Backbone(BaseModule):
 
         for i, blk in enumerate(self.backbone.blocks):
             rope_sincos = self.backbone.rope_embed(H=H, W=W)
-            x = self._forward_block(blk, i, x, rope_sincos)
+            x = self._forward_block(blk, x, rope_sincos)
             if i in blocks_to_take:
                 output.append(x)
 
