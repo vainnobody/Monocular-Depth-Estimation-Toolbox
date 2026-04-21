@@ -16,7 +16,7 @@ from .layer_scale import LayerScale
 def _checkpoint(function, *args):
     try:
         return cp.checkpoint(function, *args, use_reentrant=False)
-    except TypeError:
+    except (TypeError, ValueError):
         return cp.checkpoint(function, *args)
 
 
