@@ -194,7 +194,7 @@ if test_split_override:
 
 del os
 
-find_unused_parameters = True
+find_unused_parameters = False
 
 # Keep the official 38.4k-iter BinsFormer recipe, but make DINOv3 fine-tuning
 # more stable by using a smaller LR on the pretrained backbone.

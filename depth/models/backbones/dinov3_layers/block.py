@@ -13,6 +13,13 @@ from .ffn_layers import Mlp
 from .layer_scale import LayerScale
 
 
+def _checkpoint(function, *args):
+    try:
+        return cp.checkpoint(function, *args, use_reentrant=False)
+    except TypeError:
+        return cp.checkpoint(function, *args)
+
+
 class SelfAttentionBlock(nn.Module):
     def __init__(
         self,
@@ -108,7 +115,7 @@ class SelfAttentionBlock(nn.Module):
     def forward(self, x_or_x_list, rope_or_rope_list=None) -> Tensor:
         if isinstance(x_or_x_list, Tensor):
             if self.with_cp and x_or_x_list.requires_grad:
-                return cp.checkpoint(
+                return _checkpoint(
                     lambda x: self._forward(x, rope=rope_or_rope_list),
                     x_or_x_list,
                 )
@@ -117,7 +124,7 @@ class SelfAttentionBlock(nn.Module):
             if rope_or_rope_list is None:
                 rope_or_rope_list = [None for _ in x_or_x_list]
             return [
-                cp.checkpoint(lambda x_: self._forward(x_, rope=rope), x)
+                _checkpoint(lambda x_: self._forward(x_, rope=rope), x)
                 if self.with_cp and x.requires_grad else self._forward(x, rope=rope)
                 for x, rope in zip(x_or_x_list, rope_or_rope_list)
             ]
