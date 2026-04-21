@@ -384,9 +384,7 @@ def vit_huge2(patch_size=16, **kwargs):
         embed_dim=1280,
         depth=32,
         num_heads=20,
-        # SwiGLU reduces the effective hidden width by 2/3 in this codebase,
-        # so huge needs ratio=6 to match checkpoints with a 5120-dim FFN.
-        ffn_ratio=6,
+        ffn_ratio=4,
         **kwargs,
     )
 
