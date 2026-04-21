@@ -28,6 +28,10 @@ model = dict(
 # while still allowing server-side overrides via the existing env var.
 data = dict(samples_per_gpu=int(os.getenv('VAIHINGEN_SAMPLES_PER_GPU', '1')))
 
-find_unused_parameters = False
+# Keep unused-parameter detection enabled for BinsFormer under DDP.
+# Its decoder stack still registers parameters that do not always
+# participate in the loss graph, and activation checkpointing makes
+# the reduction error easier to surface.
+find_unused_parameters = True
 
 del os
