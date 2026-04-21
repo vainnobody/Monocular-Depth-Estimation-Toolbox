@@ -51,8 +51,9 @@ class SwiGLUFFN(nn.Module):
         super().__init__()
         out_features = out_features or in_features
         hidden_features = hidden_features or in_features
-        d = int(hidden_features * 2 / 3)
-        swiglu_hidden_features = d + (-d % align_to)
+        # DINOv3 checkpoints store SwiGLU gate widths directly at the FFN
+        # hidden size (e.g. ViT-H+ uses 5120), so do not shrink by 2/3 here.
+        swiglu_hidden_features = hidden_features + (-hidden_features % align_to)
         self.w1 = nn.Linear(
             in_features, swiglu_hidden_features, bias=bias, device=device
         )
