@@ -123,6 +123,7 @@ model = dict(
         transformer_decoder=dict(
             type='PixelTransformerDecoder',
             return_intermediate=True,
+            post_norm_cfg=None,
             num_layers=9,
             num_feature_levels=3,
             hidden_dim=256,
