@@ -1577,11 +1577,10 @@ class PixelTransformerDecoder(BaseModule):
             self.embed_dims = self.layers[0].embed_dims
             self.pre_norm = self.layers[0].pre_norm
 
-            if post_norm_cfg is not None:
-                self.post_norm = build_norm_layer(post_norm_cfg,
-                                                self.embed_dims)[1]
-            else:
-                self.post_norm = None
+            # This decoder predicts from every layer through decoder_norm below,
+            # so a separate post_norm is never consumed and only creates
+            # unused DDP parameters.
+            self.post_norm = None
         else:
             self.layers = ModuleList()
 
