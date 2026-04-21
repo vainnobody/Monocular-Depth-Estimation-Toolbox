@@ -1576,10 +1576,12 @@ class PixelTransformerDecoder(BaseModule):
             
             self.embed_dims = self.layers[0].embed_dims
             self.pre_norm = self.layers[0].pre_norm
-            # This decoder normalizes queries via `decoder_norm` in
-            # `forward_prediction_heads()`. Registering an additional
-            # `post_norm` layer here leaves a trainable parameter unused under
-            # DDP, so keep the argument for compatibility but do not build it.
+
+            if post_norm_cfg is not None:
+                self.post_norm = build_norm_layer(post_norm_cfg,
+                                                self.embed_dims)[1]
+            else:
+                self.post_norm = None
         else:
             self.layers = ModuleList()
 
