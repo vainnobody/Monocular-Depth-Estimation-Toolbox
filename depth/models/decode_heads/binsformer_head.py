@@ -76,6 +76,10 @@ class BinsFormerDecodeHead(DepthBaseDecodeHead):
                  train_cfg=dict(aux_loss=True,),
                  **kwargs):
         super(BinsFormerDecodeHead, self).__init__(**kwargs)
+        # DepthBaseDecodeHead always builds `conv_depth`, but BinsFormer
+        # predicts depth from query-decoder logits and never uses that layer.
+        # Keeping it registered causes DDP unused-parameter errors.
+        del self.conv_depth
 
         self.conv_dim = conv_dim
         self.act_cfg = act_cfg
