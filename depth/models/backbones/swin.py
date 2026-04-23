@@ -15,7 +15,7 @@ from torch.nn.modules.normalization import LayerNorm
 from torch.nn.modules.utils import _pair as to_2tuple
 
 from depth.ops import resize
-from ...utils import get_root_logger
+from ...utils import get_root_logger, load_state_dict_low_mem
 from ..builder import ATTENTION, BACKBONES
 from ..utils import swin_convert
 from depth.models.utils import PatchEmbedSwin as PatchEmbed
@@ -756,7 +756,8 @@ class SwinTransformer(BaseModule):
                             nH2, L2).permute(1, 0).contiguous()
 
             # load state_dict
-            self.load_state_dict(state_dict, False)
+            load_state_dict_low_mem(
+                self, state_dict, strict=False, assign=True)
 
     def forward(self, x):
         x = self.patch_embed(x)

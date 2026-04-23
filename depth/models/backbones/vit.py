@@ -9,13 +9,13 @@ from mmcv.cnn import build_norm_layer
 from mmcv.cnn.bricks.transformer import FFN, MultiheadAttention
 from mmcv.cnn.utils.weight_init import (constant_init, kaiming_init,
                                         trunc_normal_)
-from mmcv.runner import (BaseModule, CheckpointLoader, ModuleList,
-                         load_state_dict)
+from mmcv.runner import BaseModule, ModuleList
 from torch.nn.modules.batchnorm import _BatchNorm
 from torch.nn.modules.utils import _pair as to_2tuple
 
 from depth.ops import resize
-from depth.utils import get_root_logger
+from depth.utils import (get_root_logger, load_state_dict_low_mem,
+                         torch_load_checkpoint)
 from ..builder import BACKBONES
 from ..utils import PatchEmbed
 
@@ -279,8 +279,8 @@ class VisionTransformer(BaseModule):
         if (isinstance(self.init_cfg, dict)
                 and self.init_cfg.get('type') == 'Pretrained'):
             logger = get_root_logger()
-            checkpoint = CheckpointLoader.load_checkpoint(
-                self.init_cfg['checkpoint'], logger=logger, map_location='cpu')
+            checkpoint = torch_load_checkpoint(
+                self.init_cfg['checkpoint'], map_location='cpu')
 
             if 'state_dict' in checkpoint:
                 state_dict = checkpoint['state_dict']
@@ -300,7 +300,8 @@ class VisionTransformer(BaseModule):
                         (h // self.patch_size, w // self.patch_size),
                         (pos_size, pos_size), self.interpolate_mode)
 
-            load_state_dict(self, state_dict, strict=False, logger=logger)
+            load_state_dict_low_mem(
+                self, state_dict, strict=False, assign=True)
         elif self.init_cfg is not None:
             super(VisionTransformer, self).init_weights()
         else:

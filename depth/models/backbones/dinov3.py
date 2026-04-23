@@ -13,7 +13,8 @@ import torch
 from mmcv.runner import BaseModule
 from torch import Tensor, nn
 
-from depth.utils import get_root_logger
+from depth.utils import (get_root_logger, load_state_dict_low_mem,
+                         torch_load_checkpoint)
 from ..builder import BACKBONES
 from .dinov3_layers import (
     LayerScale,
@@ -464,9 +465,10 @@ class DINOv3Backbone(BaseModule):
                 'Please place the backbone weights at this path.')
 
         logger_ = get_root_logger()
-        checkpoint = torch.load(self.pretrained, map_location='cpu')
+        checkpoint = torch_load_checkpoint(self.pretrained, map_location='cpu')
         state_dict = _unwrap_checkpoint_state_dict(checkpoint)
-        load_result = self.backbone.load_state_dict(state_dict, strict=False)
+        load_result = load_state_dict_low_mem(
+            self.backbone, state_dict, strict=False, assign=True)
         logger_.info(
             'Loaded DINOv3 backbone from %s (missing=%d, unexpected=%d)',
             self.pretrained,
